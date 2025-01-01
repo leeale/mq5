@@ -1,0 +1,19 @@
+input data indikator 1 
+input data indikator 2
+input data indikator 3
+
+proses indikator 1 jika true ambil data simpan data signnal indikator1
+proses indikator 2 jika true ambil data simpan data signnal indikator2
+proses indikator 3 jika true ambil data simpan data signnal indikator3
+
+output simpan data signal indikator1
+output simpan data signal indikator2
+output simpan data signal indikator3
+
+input ambil data signal indikator1
+input ambil data signal indikator2
+input ambil data signal indikator3
+
+cek strategi kombinasi 
+jika and data signal indikator1 dan indikator2 dan indikator3 ada signal maka simpan ke final signal
+jika or data signal indikator1 dan indikator2 dan indikator3 ada signal maka simpan ke final signal
