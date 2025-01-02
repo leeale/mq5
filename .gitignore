@@ -1,2 +1,5 @@
-# Compiled files
+# Ignore all .ex5 files
 *.ex5
+
+# Ignore .ex5 files in all directories
+**/*.ex5
