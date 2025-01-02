@@ -89,47 +89,40 @@ enum ENUM_STRATEGY_TYPE
     STRATEGY_BREAKOUT,        // Strategi Breakout
     STRATEGY_SCALPING         // Strategi Scalping
 };
-enum ENUM_SIGNAL_FILTER
-{
-    FILTER_NONE,   // Tanpa Filter
-    FILTER_VOLUME, // Filter Volume
-    FILTER_TIME,   // Filter Waktu
-    FILTER_TREND   // Filter Tren
-};
-enum ENUM_NOTIFICATION_TYPE
-{
-    NOTIFICATION_EMAIL, // Notifikasi Email
-    NOTIFICATION_PUSH,  // Notifikasi Push
-    NOTIFICATION_SOUND, // Notifikasi Suara
-    NOTIFICATION_ALL    // Semua Jenis Notifikasi
-};
-enum ENUM_ACCOUNT_TYPE
-{
-    ACCOUNT_DEMO, // Akun Demo
-    ACCOUNT_REAL, // Akun Real
-    ACCOUNT_MICRO // Akun Micro
-};
-enum ENUM_ORDER_EXECUTION
-{
-    EXECUTION_MARKET,  // Eksekusi Market
-    EXECUTION_PENDING, // Eksekusi Pending Order
-    EXECUTION_INSTANT  // Eksekusi Instan
-};
 
-//=================================================================================================================
+//==================== ==================== =============
+/**
+ *@brief Periksa apakah pegangan MA valid
+ *
+ *@param[in] simbol Simbol untuk diperiksa
+ *@param[dalam] periode Jangka waktu untuk diperiksa
+ *@param[dalam] ma_periode MA
+ *@param[in] ma_shift Pergeseran MA
+ *@param[in] ma_method Metode MA
+ *@param[in] apply_price Harga MA yang diterapkan
+ *@param[in] menangani Handle MA
+ *
+ *@return Benar jika pegangannya valid, salah jika sebaliknya
+ */
 bool IsHandle_MA(const string &symbol,
                  const ENUM_TIMEFRAMES period,
                  const int ma_period,
                  const int ma_shift,
                  const ENUM_MA_METHOD ma_method,
-                 const ENUM_APPLIED_PRICE applied_price)
+                 const ENUM_APPLIED_PRICE applied_price, int &handle)
 {
-    int handle = iMA(symbol, period, ma_period, ma_shift, ma_method, applied_price);
-
     if (handle == INVALID_HANDLE)
     {
-        Print("Error in iMA: ", GetLastError());
-        return false;
+        Print("Trying to get handle of MA for symbol: ", symbol,
+              " with period: ", period, " and MA period: ", ma_period,
+              " and MA shift: ", ma_shift, " and MA method: ", ma_method,
+              " and applied price: ", applied_price);
+        handle = iMA(symbol, period, ma_period, ma_shift, ma_method, applied_price);
+        if (handle == INVALID_HANDLE)
+        {
+            Print("Error in iMA: ", GetLastError());
+            return false;
+        }
     }
 
     return true;
@@ -139,12 +132,11 @@ bool IsHandle_BB(const string &symbol,
                  const int bands_period,
                  const double deviation,
                  const int bands_shift,
-                 const ENUM_APPLIED_PRICE applied_price)
+                 const ENUM_APPLIED_PRICE applied_price, int &handle)
 {
-    int handle = iBands(symbol, period, bands_period, bands_shift, deviation, applied_price);
-
     if (handle == INVALID_HANDLE)
     {
+        handle = iBands(symbol, period, bands_period, bands_shift, deviation, applied_price);
         Print("Error in iBands: ", GetLastError());
         return false;
     }
