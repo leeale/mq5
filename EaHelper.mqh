@@ -1,4 +1,7 @@
 
+#ifndef EA_HELPER_MQH
+#define EA_HELPER_MQH
+
 #include <Trade/Trade.mqh>
 #property strict
 
@@ -672,3 +675,5 @@ bool IsPriceGap(double threshold, string symbol = NULL, ENUM_TIMEFRAMES timefram
 
     return (gap > threshold); // Jika gap lebih besar dari threshold, maka gap harga terjadi
 }
+
+#endif // EA_HELPER_MQH
