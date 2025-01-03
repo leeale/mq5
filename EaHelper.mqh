@@ -6,6 +6,12 @@
 #property strict
 
 // ================== ENUM GENERAL ==================
+enum ENUM_SYMBOL_TYPE
+{
+    MULTI_SYMBOL,   // Multi Symbol
+    SYMBOL_CURRENT, // Current Symbol
+    SYMBOL_CUSTOM   // Custom Symbol
+};
 enum ENUM_ON_OFF
 {
     ON, // On
@@ -22,11 +28,14 @@ enum ENUM_STRATEGY_COMBINATION
     AND, // -- AND --
     OR   // -- OR --
 };
-// ================== ENUM MA ==================
+// === ENUM MA ===
+
 enum ENUM_MA_SIGNAL_TYPE
+
 {
-    MA_SIGNAL_CROSS,  // Cross
-    MA_SIGNAL_UP_DOWN // Up And Down
+    MA_SIGNAL_CROSS,                // Cross
+    MA_SIGNAL_UP_DOWN,              // Up And Down indikator Only
+    MA_SIGNAL_UP_DOWN_CURRENTPRICE, // Up And Down + Current Price
 };
 
 enum ENUM_MA_SIGNAL_INDIKATOR1
@@ -104,15 +113,17 @@ enum ENUM_STRATEGY_TYPE
  *
  *@return Benar jika pegangannya valid, salah jika sebaliknya
  */
-bool IsHandle_MA(const string &symbol,
-                 const ENUM_TIMEFRAMES period,
-                 const int ma_period,
-                 const int ma_shift,
-                 const ENUM_MA_METHOD ma_method,
-                 const ENUM_APPLIED_PRICE applied_price, int &handle)
+bool IsHandle_MA(string symbol,
+                 ENUM_TIMEFRAMES period,
+                 int ma_period,
+                 int ma_shift,
+                 ENUM_MA_METHOD ma_method,
+                 ENUM_APPLIED_PRICE applied_price, int &handle)
 {
+    // Print("handle di dalam fungsi ishnadlema : ", handle);
     if (handle == INVALID_HANDLE)
     {
+
         Print("Trying to get handle of MA for symbol: ", symbol,
               " with period: ", period, " and MA period: ", ma_period,
               " and MA shift: ", ma_shift, " and MA method: ", ma_method,
@@ -202,11 +213,11 @@ void ReleaseHandleMA(int handle)
     if (handle != INVALID_HANDLE)
     {
         IndicatorRelease(handle);
-        Print("Handle MA telah dirilis.");
+        Print("Handle MA telah dirilis.", handle);
     }
     else
     {
-        Print("Handle tidak valid, tidak perlu dirilis.");
+        Print("Handle tidak valid, tidak perlu dirilis.", handle);
     }
 }
 void ReleaseHandleBB(int handle)
@@ -289,12 +300,12 @@ double GetBidPrice2(string symbol = NULL)
     return SymbolInfoDouble(symbol, SYMBOL_BID);
 }
 
-bool OpenMarketOrder(const string symbol, ENUM_ORDER_TYPE order_type, double volume, double sl = 0, double tp = 0)
+bool OpenMarketOrder(const string symbol, ENUM_ORDER_TYPE order_type, double volume, double sl = 0, double tp = 0, string comment = "")
 {
     CTrade trade;
     if (order_type == ORDER_TYPE_BUY)
     {
-        if (!trade.Buy(volume, symbol, GetAskPrice(symbol), sl, tp))
+        if (!trade.Buy(volume, symbol, GetAskPrice(symbol), sl, tp, comment))
         {
             Print("Error in Buy: ", trade.ResultRetcode(), " - ", trade.ResultRetcodeDescription());
             return false;
@@ -383,6 +394,20 @@ bool ModifyOrder(ulong ticket, double sl, double tp)
 {
     CTrade trade;
     return trade.PositionModify(ticket, sl, tp);
+}
+
+/**
+ *Mengembalikan nama simbol pada indeks yang ditentukan.
+ *
+ *@param indeks Indeks simbol dalam daftar.
+ *@param tampilan Opsional; jika benar, simbol diambil dari daftar simbol yang dipilih di MarketWatch.
+ *
+ *@return Nama simbol sebagai string.
+ */
+
+string GetSymbolName(int index, bool view = true)
+{
+    return SymbolName(index, true);
 }
 double GetOrderOpenPrice(ulong ticket)
 {
@@ -667,5 +692,94 @@ bool IsPriceGap(double threshold, string symbol = NULL, ENUM_TIMEFRAMES timefram
 
     return (gap > threshold); // Jika gap lebih besar dari threshold, maka gap harga terjadi
 }
+
+bool InitializeSymbolsFromInput(string &symbols[], ENUM_ON_OFF isMultiSymbol)
+{
+    if (isMultiSymbol == ON)
+    {
+        // Get symbols from Market Watch
+        int totalSymbols = SymbolsTotal(true);
+        if (totalSymbols <= 0)
+        {
+            Print("No symbols found in Market Watch");
+            return false;
+        }
+
+        if (!ArrayResize(symbols, totalSymbols))
+        {
+            Print("Failed to resize symbols array");
+            return false;
+        }
+
+        // Store Market Watch symbols
+        for (int i = 0; i < totalSymbols; i++)
+        {
+            symbols[i] = SymbolName(i, true);
+        }
+    }
+    else
+    {
+        // Use current symbol only
+        if (!ArrayResize(symbols, 1))
+        {
+            Print("Failed to resize symbols array");
+            return false;
+        }
+        symbols[0] = _Symbol;
+    }
+
+    return true;
+}
+
+bool ValidateSymbols(const string &symbols[])
+{
+    for (int i = 0; i < ArraySize(symbols); i++)
+    {
+        if (!SymbolSelect(symbols[i], true))
+        {
+            Print("Failed to select symbol: ", symbols[i]);
+            return false;
+        }
+
+        if (!IsSymbolTradeable(symbols[i]))
+        {
+            Print("Symbol not tradeable: ", symbols[i]);
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * @brief Memeriksa filter indikator apakah sinyal indikator dapat diaktifkan
+ * @param active status aktif indikator
+ * @param buy status sinyal beli
+ * @param sell status sinyal jual
+ * @return true jika filter indikator sinyal valid, false jika tidak
+ */
+bool IsFilterIndikator(ENUM_ON_OFF active, ENUM_ACTIVE_DISABLE buy, ENUM_ACTIVE_DISABLE sell)
+{
+    if (active != ON)
+        return false;
+    if (buy != ACTIVE && sell != ACTIVE)
+        return false;
+    return true;
+}
+
+// if (InitializeSymbolsFromInput(g_Symbol, multi_symbol))
+// {
+//     if (ValidateSymbols(g_Symbol))
+//     {
+//         // Process each symbol
+//         for (int i = 0; i < ArraySize(g_Symbol); i++)
+//         {
+//             // Your trading logic here using symbols[i]
+//             // if (debug)
+//             // Print("Processing symbol: ", g_Symbol[i]);
+//         }
+//     }
+// }
+// Print("total symbol : ", ArraySize(g_Symbol));
+// Print("handle", ArraySize(g_handlma1));
 
 #endif // EA_HELPER_MQH
