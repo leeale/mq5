@@ -1,3 +1,7 @@
+
+#property copyright "Copyright 2024, Ali Usman"
+#property version "1.00"
+#property strict
 #include "StrategyBuilder/Input.mqh"
 
 struct symbolInfo

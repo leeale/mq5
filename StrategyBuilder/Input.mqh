@@ -1,7 +1,4 @@
 
-#property copyright "Copyright 2024, Ali Usman"
-#property version "1.00"
-#property strict
 
 #include <Trade/Trade.mqh>
 #include <Trade/PositionInfo.mqh>
@@ -24,7 +21,7 @@ input string multi_symbol_custom = "EURUSD,GBPUSD,USDJPY";     // Custom Symbol 
 
 input string _Lll = "========== ( SETTING OPEN ORDER) =========="; // ​
 input double lot = 0.01;                                           // Lot Size
-input int Stoploss = 0;                                            // Stop Loss (Pointt)
+input int Stoploss = 100;                                          // Stop Loss (Pointt)
 input int Takeprofit = 0;                                          // Take Profit (Point)
 input int magic_number = 123456;                                   // Magic Number
 input string komment = "";                                         // Comment
