@@ -1,20 +1,45 @@
+
+#property copyright "Copyright 2024, Ali Usman"
+#property version "1.00"
+#property strict
+
+#include <Trade/Trade.mqh>
+#include <Trade/PositionInfo.mqh>
 #include "Enum.mqh"
 
-input string _ll = "========== (0# SETTING GENERAL) =========="; // ​
-input ENUM_ON_OFF debug = ON;                                    // Debuging
-input ENUM_ON_OFF power = ON;                                    // Power EA
-input double lot = 0.01;                                         // Lot Size
-input ENUM_STRATEGY_COMBINATION combi_signal = AND;              // Signal Combination
+#define MAGIC_NUMBER magic_number
+#define BUTTON_NAME "closeall"
+double m_savedBalance;
+bool m_isBalanceLoaded;
+int m_targetProfit;
 
-input int max_spread = 0;            // Max Spread (0 = No Max Spread)
-input int jam_start = 0;             // Jam Start (0 = No Jam Start)
-input int jam_end = 0;               // Jam End (0 = No Jam End)
-input ENUM_DAY_INDO no_day_trading1; // No Day Trading 1
-input ENUM_DAY_INDO no_day_trading2; // No Day Trading 2
+input string _ll = "========== ( SETTING GENERAL) =========="; // ​
+input ENUM_ON_OFF debug = OFF;                                 // Debuging
+input ENUM_ON_OFF power = ON;                                  // Power EA
+input ENUM_STRATEGY_COMBINATION combi_signal = AND;            // Signal Combination
 
-input string _ll2 = "========== (0# SETTING SYMBOL) =========="; // ​
-input ENUM_SYMBOL_TYPE multi_symbol = MULTI_SYMBOL;              // Symbol Type
-input string multi_symbol_custom = "EURUSD,GBPUSD,USDJPY";       // Custom Symbol (ex: EURUSD,GBPUSD,USDJPY)
+input string _ll2 = "========== ( SETTING SYMBOL) =========="; // ​
+input ENUM_SYMBOL_TYPE multi_symbol = MULTI_SYMBOL;            // Symbol Type
+input string multi_symbol_custom = "EURUSD,GBPUSD,USDJPY";     // Custom Symbol (ex: EURUSD,GBPUSD,USDJPY)
+
+input string _Lll = "========== ( SETTING OPEN ORDER) =========="; // ​
+input double lot = 0.01;                                           // Lot Size
+input int Stoploss = 0;                                            // Stop Loss (Pointt)
+input int Takeprofit = 0;                                          // Take Profit (Point)
+input int magic_number = 123456;                                   // Magic Number
+input string komment = "";                                         // Comment
+
+input string _lll = "======= ( SETTING MAX ORDER / LIMIT ORDER) ======="; // ​
+input ENUM_ONE_ORDER_TYPE one_order_type = ONE_ORDER_PER_SYMBOL;          // One Order Max Type
+input int max_order = 0;                                                  // Max Order Per Symbol
+input int max_order_total = 0;                                            // Max Order Total
+
+input string _sdf = "========== ( SETTING FILTER) =========="; // ​
+input int max_spread = 35;                                     // Max Spread (0 = No Max Spread)
+input int jam_start = 2;                                       // Jam Start (0 = No Jam Start)
+input int jam_end = 22;                                        // Jam End (0 = No Jam End)
+input ENUM_DAY_INDO no_day_trading1 = Disable;                 // No Day Trading 1
+input ENUM_DAY_INDO no_day_trading2 = Disable;                 // No Day Trading 2
 
 input string ma1 = "========== (MA) 1# indikator MA =========="; // ​
 input ENUM_ON_OFF ma1_active = OFF;                              // Active Averaging
@@ -173,4 +198,141 @@ int Spread(string symbol)
 double SpreadPoint(string symbol)
 {
     return Spread(symbol) * Point(symbol);
+}
+
+void CloseAllOrders()
+{
+    CPositionInfo position;
+    CTrade trade;
+    for (int i = PositionsTotal() - 1; i >= 0; i--)
+    {
+        if (position.SelectByIndex(i))
+        {
+            if (!trade.PositionClose(position.Ticket()))
+                Print("Error closing position: ", GetLastError());
+            else
+                Print("Position closed: ", position.Symbol());
+        }
+    }
+
+    // Close pending orders if any
+    for (int i = OrdersTotal() - 1; i >= 0; i--)
+    {
+        ulong ticket = OrderGetTicket(i);
+        if (ticket > 0)
+        {
+            trade.OrderDelete(ticket);
+        }
+    }
+}
+void CreateCloseButton()
+{
+    if (ObjectFind(0, BUTTON_NAME) >= 0)
+        ObjectDelete(0, BUTTON_NAME);
+
+    if (!ObjectCreate(0, BUTTON_NAME, OBJ_BUTTON, 0, 0, 0))
+    {
+        Print("Failed to create button: ", GetLastError());
+        return;
+    }
+
+    ObjectSetInteger(0, BUTTON_NAME, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+    ObjectSetInteger(0, BUTTON_NAME, OBJPROP_XDISTANCE, 20);
+    ObjectSetInteger(0, BUTTON_NAME, OBJPROP_YDISTANCE, 30);
+    ObjectSetInteger(0, BUTTON_NAME, OBJPROP_XSIZE, 100);
+    ObjectSetInteger(0, BUTTON_NAME, OBJPROP_YSIZE, 30);
+    ObjectSetString(0, BUTTON_NAME, OBJPROP_TEXT, "Close All");
+    ObjectSetInteger(0, BUTTON_NAME, OBJPROP_COLOR, clrBlack);
+    ObjectSetInteger(0, BUTTON_NAME, OBJPROP_BORDER_COLOR, clrBlack);
+    ObjectSetInteger(0, BUTTON_NAME, OBJPROP_BGCOLOR, clrWhite);
+    ObjectSetInteger(0, BUTTON_NAME, OBJPROP_SELECTABLE, false);
+}
+
+void ShowTargetOnChart()
+{
+    double currentEquity = AccountInfoDouble(ACCOUNT_EQUITY);
+    double targetBalance = m_savedBalance + m_targetProfit;
+    double remainingToTarget = currentEquity - targetBalance + m_targetProfit;
+
+    if (ObjectFind(0, "TargetLabel1") < 0)
+        ObjectCreate(0, "TargetLabel1", OBJ_LABEL, 0, 0, 0);
+
+    ObjectSetInteger(0, "TargetLabel1", OBJPROP_CORNER, CORNER_LEFT_UPPER);
+    ObjectSetInteger(0, "TargetLabel1", OBJPROP_XDISTANCE, 20);
+    ObjectSetInteger(0, "TargetLabel1", OBJPROP_YDISTANCE, 80);
+    ObjectSetString(0, "TargetLabel1", OBJPROP_TEXT,
+                    "Target: $" + DoubleToString(targetBalance, 2));
+    ObjectSetInteger(0, "TargetLabel1", OBJPROP_COLOR, clrWhite);
+    ObjectSetInteger(0, "TargetLabel1", OBJPROP_FONTSIZE, 10);
+
+    if (ObjectFind(0, "TargetLabel2") < 0)
+        ObjectCreate(0, "TargetLabel2", OBJ_LABEL, 0, 0, 0);
+
+    ObjectSetInteger(0, "TargetLabel2", OBJPROP_CORNER, CORNER_LEFT_UPPER);
+    ObjectSetInteger(0, "TargetLabel2", OBJPROP_XDISTANCE, 20);
+    ObjectSetInteger(0, "TargetLabel2", OBJPROP_YDISTANCE, 95);
+    ObjectSetString(0, "TargetLabel2", OBJPROP_TEXT,
+                    "Remaining: $" + DoubleToString(remainingToTarget, 2));
+    ObjectSetInteger(0, "TargetLabel2", OBJPROP_COLOR, remainingToTarget > 0 ? clrLime : clrRed);
+    ObjectSetInteger(0, "TargetLabel2", OBJPROP_FONTSIZE, 10);
+
+    ChartRedraw(0);
+}
+
+void CheckAndCloseAllOrders()
+{
+    double currentEquity = AccountInfoDouble(ACCOUNT_EQUITY);
+    double targetBalance = m_savedBalance + m_targetProfit;
+
+    if (currentEquity >= targetBalance)
+    {
+        Print("Target reached! Initial balance: ", m_savedBalance,
+              " Target: ", targetBalance,
+              " Current equity: ", currentEquity);
+
+        CloseAllOrders();
+
+        double newBalance = AccountInfoDouble(ACCOUNT_BALANCE);
+        string filename = "balance_history.txt";
+        int handle = FileOpen(filename, FILE_WRITE | FILE_TXT | FILE_ANSI);
+        if (handle != INVALID_HANDLE)
+        {
+            FileWriteString(handle, DoubleToString(newBalance, 2));
+            FileClose(handle);
+            m_savedBalance = newBalance;
+            Print("New balance saved: ", newBalance);
+        }
+    }
+}
+double LoadBalance()
+{
+    if (!m_isBalanceLoaded)
+    {
+        string filename = "balance_history.txt";
+        if (FileIsExist(filename))
+        {
+            int handle = FileOpen(filename, FILE_READ | FILE_TXT | FILE_ANSI);
+            string content = FileReadString(handle);
+            m_savedBalance = StringToDouble(content);
+            FileClose(handle);
+        }
+        else
+        {
+            double currentBalance = AccountInfoDouble(ACCOUNT_BALANCE);
+            int handle = FileOpen(filename, FILE_WRITE | FILE_TXT | FILE_ANSI);
+            FileWriteString(handle, DoubleToString(currentBalance, 2));
+            FileClose(handle);
+            m_savedBalance = currentBalance;
+        }
+        m_isBalanceLoaded = true;
+    }
+    return m_savedBalance;
+}
+
+void DeleteButtonAndLabels()
+{
+    ObjectDelete(0, "TargetLabel1");
+    ObjectDelete(0, "TargetLabel2");
+    ObjectDelete(0, BUTTON_NAME);
+    ChartRedraw(0);
 }

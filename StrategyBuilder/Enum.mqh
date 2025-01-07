@@ -2,19 +2,28 @@
 // ================== ENUM GENERAL ==================
 enum ENUM_DAY_INDO
 {
+    Minggu,
     Senin,
     Selasa,
     Rabu,
     Kamis,
     Jumat,
     Sabtu,
-    Minggu
+    Disable
 
+};
+enum ENUM_ONE_ORDER_TYPE
+{
+    ONE_ORDER_PER_SYMBOL,                         // One Order Per Symbol
+    ONE_ORDER_TOTAL_POSITION,                     // One Order Total Position
+    ONE_ORDER_MAGIC_NUMBER_SYMBOL,                // One Order Magic Number Symbol
+    ONE_ORDER_MAGIC_NUMBER_SYMBOL_TOTAL_POSITION, // One Order Magic Number Total Position
+    DISABLE                                       // Disable
 };
 enum ENUM_SYMBOL_TYPE
 {
     MULTI_SYMBOL,   // Multi Symbol Market Watch
-    SYMBOL_CURRENT, // Current Symbol
+    SYMBOL_CURRENT, // Current Symbo
     SYMBOL_CUSTOM   // Custom Symbol
 };
 enum ENUM_ON_OFF
