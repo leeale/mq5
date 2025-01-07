@@ -2,69 +2,39 @@
 #include "EaHelper.mqh"
 #include "EaInput1.mqh"
 
-// variable global
-// string g_Symbol[];
-// int g_signal[2];
-// int g_handlma1[2];
-
 struct symbolInfo
 {
     int index;
     string symbol;
     int signal;
+    bool isActive;
+    bool isBuy;
+    bool isSell;
+
     int handle1[];
 };
-// string g_Symbol[2];
 int totalSymbol;
-int number;
+int n;
 int totalhandle = 2;
 
 symbolInfo g_symbolInfo[];
 
 int OnInit()
 {
-    totalSymbol = SymbolsTotal(true);
-    number = totalSymbol - totalSymbol;
-    ArrayResize(g_symbolInfo, totalSymbol);
-    for (int i = 0; i < totalSymbol; i++)
+
+    n = -1;
+    if (!InitSymbol())
     {
-        g_symbolInfo[i].signal = 0;
-        g_symbolInfo[i].index = i;
-        g_symbolInfo[i].symbol = GetSymbolName(i);
-        ArrayResize(g_symbolInfo[i].handle1, totalhandle); // Resize untuk 2 handle MA per symbol
-        for (int j = 0; j < totalhandle; j++)
-        {
-            g_symbolInfo[i].handle1[j] = INVALID_HANDLE;
-        }
+        Print("Error Custom Symbol");
+        return (INIT_FAILED);
     }
-
-    // inisialisasi handle
-    // int count = ArraySize(g_handlma1);
-    // for (int i = 0; i < count; i++)
-    // {
-    //     g_handlma1[i] = INVALID_HANDLE;
-    // }
-    // // inisialisasi signal
-    // for (int i = 0; i < ArraySize(g_signal); i++)
-    // {
-    //     g_signal[i] = 0;
-    //     if (debug)
-    //         Print("g_signal index : ", i, " value : ", g_signal[i]);
-    // }
-    // inisialisasi symbol
-    // g_Symbol = _Symbol;
-
-    EventSetTimer(100);
-
+    EventSetTimer(5);
     return (INIT_SUCCEEDED);
 }
 
 void OnDeinit(const int reason)
 {
-    // for (int i = 0; i < ArraySize(g_handlma1); i++)
-    // {
-    //     ReleaseHandleMA(g_handlma1[i]);
-    // }
+
     for (int i = 0; i < totalSymbol; i++)
     {
         for (int j = 0; j < totalhandle; j++)
@@ -80,52 +50,35 @@ void OnDeinit(const int reason)
 void OnTick()
 {
 }
-string GetSymbolName(int index, ENUM_SYMBOL_TYPE multisymbol)
+
+bool FilterInit(string &symbol)
 {
-    if (multisymbol == MULTI_SYMBOL)
+    if (PositionSelect(symbol))
     {
-        return g_symbolInfo[index].symbol;
+        return false;
     }
-    else if (multisymbol == SYMBOL_CURRENT)
-    {
-        return _Symbol;
-    }
-    else
-    {
-        return _Symbol;
-    }
+    return true;
 }
 
 void OnTimer()
 {
-    int n;
-    Loop(number, totalSymbol, n);
 
-    string symbol = GetSymbolName(n, multi_symbol);
+    n++;
+    if (n >= totalSymbol)
+        n = 0;
+    string symbol = g_symbolInfo[n].symbol;
+
+    if (!FilterInit(symbol))
+    {
+        return;
+    }
 
     bool isSignalMA1 = (IsIndikatorMa(ma1_active, ma1_buy, ma1_sell, symbol, PERIOD_CURRENT,
                                       ma1_periode1, ma1_shift1, ma1_method1, ma1_price1, ma1_periode2, ma1_shift2, ma1_method2, ma1_price2,
                                       ma1_signal_indikator1, ma1_signal_indikator2, ma1_type,
-                                      ma1_buy, ma1_sell, 0, g_symbolInfo[n].handle1[0], g_symbolInfo[n].handle1[1]));
-    bool order = ExecutionOrder(isSignalMA1, OR, g_symbolInfo[n].signal, symbol, 0.01, "Buy Signal", 0, 100);
+                                      ma1_buy, ma1_sell, n, g_symbolInfo[n].handle1[0], g_symbolInfo[n].handle1[1]));
 
-    // bool isSignalMA2 = (IsIndikatorMa(ma2_active, ma2_buy, ma2_sell, g_Symbol, PERIOD_CURRENT,
-    //                                 ma2_periode1, ma2_shift1, ma2_method1, ma2_price1, ma2_periode2, ma2_shift2, ma2_method2, ma2_price2,
-    //                            ma2_signal_indikator1, ma2_signal_indikator2, ma2_type,
-    //                       ma2_buy, ma2_sell, 1, g_handlma1));
-    // if (isSignalMA1)
-    // {
-    //     if (g_signal[0] == 1)
-    //     {
-    //         Print("Buy Signal");
-    //     }
-    //     else
-    //     {
-    //         Print("sell Signal");
-    //     }
-    // }
-    // Print("Signal : ", g_signal[0]);
-    // number++;
+    bool order = ExecutionOrder(isSignalMA1, OR, g_symbolInfo[n].signal, symbol, 0.01, "Buy Signal", 0, 100);
 }
 
 void OnChartEvent(const int id,
@@ -169,21 +122,86 @@ struct Helper
 {
     int index_helper;
 };
-void Loop(int &num, int &tot, int &n)
+bool InitSymbol()
 {
-    num++;
-    n = num - 1;
-    if (num >= tot)
-        num = 0;
+    if (true)
+    {
+        string Data[];
+        if (multi_symbol == 0)
+        {
+            totalSymbol = SymbolsTotal(true);
+        }
+        else if (multi_symbol == 2)
+        {
+
+            string dataString = multi_symbol_custom;
+            int count = StringSplit(dataString, ',', Data);
+            totalSymbol = count;
+        }
+        else
+        {
+            totalSymbol = 1;
+        }
+        ArrayResize(g_symbolInfo, totalSymbol);
+
+        for (int i = 0; i < totalSymbol; i++)
+        {
+            g_symbolInfo[i].signal = 0;
+            g_symbolInfo[i].index = i;
+
+            if (multi_symbol == 0)
+                g_symbolInfo[i].symbol = GetSymbolName(i);
+            else if (multi_symbol == 2)
+                g_symbolInfo[i].symbol = Data[i];
+            else
+                g_symbolInfo[i].symbol = _Symbol;
+
+            ArrayResize(g_symbolInfo[i].handle1, totalhandle);
+            for (int j = 0; j < totalhandle; j++)
+            {
+                g_symbolInfo[i].handle1[j] = INVALID_HANDLE;
+            }
+        }
+        return true;
+    }
+    Print("Error Init Symbol");
+    return false;
 }
-bool ExecutionOrder(bool signalinfo, ENUM_STRATEGY_COMBINATION Or_and, int finalsignal, string symbol, double volume, string comment, double sl = 0, double tp = 0)
+
+bool debug()
 {
-    if (PositionSelect(symbol))
+    if (debug == ON)
+    {
+        return true;
+    }
+    else
     {
         return false;
     }
-    Print("combisignal : ", combi_signal);
-    if (signalinfo && combi_signal == Or_and && finalsignal != 0)
+}
+/**
+ * @brief Menghasilkan perintah beli/jual berdasarkan sinyal yang dihasilkan
+ *
+ * Fungsi ini akan menghasilkan perintah beli/jual berdasarkan sinyal yang
+ * dihasilkan oleh indikator. Fungsi ini akan memeriksa kondisi sinyal, jika
+ * sinyalnya benar maka akan menghasilkan perintah beli/jual. Jika tidak maka
+ * tidak akan menghasilkan perintah apapun.
+ *
+ * @param signalinfo Sinyal yang dihasilkan oleh indikator
+ * @param Or_and Jenis sinyal kombinasinya (OR atau AND)
+ * @param finalsignal Sinyal akhir yang dihasilkan (1 = Buy, -1 = Sell)
+ * @param symbol Simbol yang akan di perdagangkan
+ * @param volume Jumlah lot yang akan di perdagangkan
+ * @param comment Komentar yang akan di tambahkan pada perintah beli/jual
+ * @param sl StopLoss yang akan di set (default = 0)
+ * @param tp TakeProfit yang akan di set (default = 0)
+ * @return true jika perintah berhasil dihasilkan, false jika tidak
+ */
+bool ExecutionOrder(bool signalinfo, ENUM_STRATEGY_COMBINATION Or_and, int finalsignal, string symbol, double volume, string comment, double sl = 0, double tp = 0)
+{
+
+    // Print("combisignal : ", combi_signal);
+    if (combi_signal == Or_and && finalsignal != 0)
     {
         Print("or masuk");
         double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
@@ -209,7 +227,7 @@ bool ExecutionOrder(bool signalinfo, ENUM_STRATEGY_COMBINATION Or_and, int final
             }
             OpenMarketOrder(symbol, ORDER_TYPE_BUY, volume, sl, tp, comment);
         }
-        else
+        else if (finalsignal == -1)
         {
             if (sl != 0)
             {
@@ -227,8 +245,9 @@ bool ExecutionOrder(bool signalinfo, ENUM_STRATEGY_COMBINATION Or_and, int final
             }
             OpenMarketOrder(symbol, ORDER_TYPE_SELL, volume, sl, tp, comment);
         }
+        return true;
     }
-    return true;
+    return false;
 }
 
 struct Proses_Signal
@@ -439,4 +458,40 @@ bool updateSignal(ENUM_ACTIVE_DISABLE buyorsell, int i, int signal = 1)
         return true;
     }
     return false;
+}
+
+void DisplaySymbolInfo(symbolInfo &info)
+{
+    if (debug)
+    {
+        Print("=== Symbol Info ===");
+        Print("Index: ", info.index);
+        Print("Symbol: ", info.symbol);
+        Print("Signal: ", info.signal);
+        Print("Handles: ");
+        for (int i = 0; i < ArraySize(info.handle1); i++)
+        {
+            Print("  Handle[", i, "]: ", info.handle1[i]);
+        }
+        Print("================");
+    }
+}
+int GetTotalHandles()
+{
+    int totalHandles = 0;
+    for (int i = 0; i < ArraySize(g_symbolInfo); i++)
+    {
+        totalHandles += ArraySize(g_symbolInfo[i].handle1);
+    }
+
+    if (debug)
+    {
+        Print("=== Handle Summary ===");
+        Print("Total Symbols: ", ArraySize(g_symbolInfo));
+        Print("Total Handles: ", totalHandles);
+        Print("Handles per Symbol: ", ArraySize(g_symbolInfo[0].handle1));
+        Print("===================");
+    }
+
+    return totalHandles;
 }

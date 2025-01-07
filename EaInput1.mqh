@@ -4,7 +4,14 @@
 #include "EaHelper.mqh"
 
 #property strict
-input bool debug = true;                                                                              // Debuging
+input string __er = "========== (0# SETTING GENERAL) =========="; // ​
+input ENUM_ON_OFF debug = true;                                   // Debuging
+input ENUM_SYMBOL_TYPE multi_symbol = MULTI_SYMBOL;               // Symbol Type
+input string multi_symbol_custom = "";                            // Custom Symbol (ex: EURUSD,GBPUSD,USDJPY)
+// input string _combi = "========== (STRATEGI/SIGNAL COMBINATION) =========="; // ​
+input ENUM_STRATEGY_COMBINATION combi_signal = AND; // Signal Combination
+// input string _multiSymbol = "========== (MULTI SYMBOL) ==========";         // ​
+// Debuging
 input string ma1 = "========== (MA) 1# indikator MA ==========";                                      // ​
 input ENUM_ON_OFF ma1_active = ON;                                                                    // Active Averaging
 input ENUM_MA_SIGNAL_TYPE ma1_type = MA_SIGNAL_UP_DOWN_CURRENTPRICE;                                  // Strategy Type
@@ -52,11 +59,5 @@ input double bb1_deviation = 2.0;                                // Deviation BB
 input ENUM_MA_METHOD bb1_method = MODE_SMA;                      // Method BB
 input ENUM_APPLIED_PRICE bb1_price = PRICE_CLOSE;                // Price BB
 input int bb_signal_bar = 0;                                     // Signal Bar (0 = Current Bar, 1 = Previous Bar dst)
-
-input string _combi = "========== (STRATEGI/SIGNAL COMBINATION) =========="; // ​
-input ENUM_STRATEGY_COMBINATION combi_signal = AND;                          // Signal Combination
-input string _multiSymbol = "========== (MULTI SYMBOL) ==========";          // ​
-input ENUM_SYMBOL_TYPE multi_symbol = MULTI_SYMBOL;                          // Multi Symbol By Market Watch
-// input string multi_symbol_custom = "";                                       // Multi Symbol Custom EURUSD,GBPUSD,USDJPY
 
 #endif // EAINPUT1_MQH

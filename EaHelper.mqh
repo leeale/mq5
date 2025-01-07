@@ -8,7 +8,7 @@
 // ================== ENUM GENERAL ==================
 enum ENUM_SYMBOL_TYPE
 {
-    MULTI_SYMBOL,   // Multi Symbol
+    MULTI_SYMBOL,   // Multi Symbol Market Watch
     SYMBOL_CURRENT, // Current Symbol
     SYMBOL_CUSTOM   // Custom Symbol
 };
