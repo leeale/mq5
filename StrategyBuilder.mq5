@@ -21,7 +21,6 @@ symbolInfo symbolArray[];
 // variable Global
 int totalHandles;
 int totalSymbols;
-bool active;
 
 void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
 {
@@ -35,12 +34,10 @@ int OnInit()
 {
     m_savedBalance = 0;
     m_isBalanceLoaded = false;
-    m_targetProfit = 10;
     LoadBalance();
     ShowTargetOnChart();
     CreateCloseButton();
 
-    active = (power == ON);
     CalcSymbol();
     totalHandles = 11;
 
@@ -72,8 +69,7 @@ int OnInit()
 }
 void OnTick()
 {
-    ShowTargetOnChart();
-    CheckAndCloseAllOrders();
+    TargetOnChart();
 }
 void OnTimer()
 {
@@ -105,8 +101,29 @@ void OnTimer()
         }
     }
     UpdateFinalSignal();
-    OpenPosition();
     // GetDataSymbol();
+    OpenPosition();
+    HiddenTP_SL();
+}
+
+void OnDeinit(const int reason)
+{
+
+    for (int i = 0; i < totalSymbols; i++)
+    {
+        for (int j = 0; j < totalHandles; j++)
+        {
+            if (symbolArray[i].handle[j] != INVALID_HANDLE)
+            {
+                bool released = IndicatorRelease(symbolArray[i].handle[j]);
+                if (released)
+                    Print("Handle released: ", symbolArray[i].symbol, " handle[", j, "]=", symbolArray[i].handle[j]);
+                symbolArray[i].handle[j] = INVALID_HANDLE;
+            }
+        }
+    }
+    DeleteButtonAndLabels();
+    EventKillTimer();
 }
 
 enum ENUM_FILTER_RESULT
@@ -120,7 +137,8 @@ enum ENUM_FILTER_RESULT
 
 ENUM_FILTER_RESULT FilterCondition(string symbol, string &message)
 {
-    if (!active)
+
+    if (power == OFF)
     {
         message = StringFormat("Filter: %s power off", symbol);
         return FILTER_POWER_OFF;
@@ -163,25 +181,6 @@ ENUM_FILTER_RESULT FilterCondition(string symbol, string &message)
     return FILTER_PASS;
 }
 
-void OnDeinit(const int reason)
-{
-
-    for (int i = 0; i < totalSymbols; i++)
-    {
-        for (int j = 0; j < totalHandles; j++)
-        {
-            if (symbolArray[i].handle[j] != INVALID_HANDLE)
-            {
-                bool released = IndicatorRelease(symbolArray[i].handle[j]);
-                if (released)
-                    Print("Handle released: ", symbolArray[i].symbol, " handle[", j, "]=", symbolArray[i].handle[j]);
-                symbolArray[i].handle[j] = INVALID_HANDLE;
-            }
-        }
-    }
-    DeleteButtonAndLabels();
-    EventKillTimer();
-}
 void CalcSymbol()
 {
     string symboldata[];
@@ -544,30 +543,44 @@ void UpdateSignalMA(int i, int j, double &value1[])
     // Cek Buy
     if (symbolArray[i].isBuy[j])
     {
-        if (symbolArray[i].signal_type[j] == 0)
+        switch (symbolArray[i].signal_type[j])
         {
+        case ENUM_SIGNAL_TYPE::CROSS: // Cross
             if (p0 > i0 && p1 < i1)
                 symbolArray[i].signal[j] = 1;
-        }
-        else if (symbolArray[i].signal_type[j] == 1)
-        {
+            break;
+
+        case ENUM_SIGNAL_TYPE::UP_DOWN: // Up Down
             if (p0 > i0)
                 symbolArray[i].signal[j] = 1;
+            break;
+
+        case ENUM_SIGNAL_TYPE::UP_DOWN_REVERSE: // Up Down Reverse
+            if (p0 < i0)
+                symbolArray[i].signal[j] = 1;
+            break;
         }
     }
 
     // Cek Sell - hanya jika tidak ada buy signal
     if (symbolArray[i].isSell[j] && symbolArray[i].signal[j] == 0)
     {
-        if (symbolArray[i].signal_type[j] == 0)
+        switch (symbolArray[i].signal_type[j])
         {
+        case ENUM_SIGNAL_TYPE::CROSS:
             if (p0 < i0 && p1 > i1)
                 symbolArray[i].signal[j] = -1;
-        }
-        else if (symbolArray[i].signal_type[j] == 1)
-        {
+            break;
+
+        case ENUM_SIGNAL_TYPE::UP_DOWN:
             if (p0 < i0)
                 symbolArray[i].signal[j] = -1;
+            break;
+
+        case ENUM_SIGNAL_TYPE::UP_DOWN_REVERSE:
+            if (p0 > i0)
+                symbolArray[i].signal[j] = -1;
+            break;
         }
     }
 }
@@ -577,11 +590,6 @@ void UpdateSignalBB(int i, int j, double &value1[], double &value2[])
     double upper1 = value1[1];
     double lower0 = value2[0];
     double lower1 = value2[1];
-
-    // Print("upper0: ", upper0);
-    // Print("upper1: ", upper1);
-    // Print("lower0: ", lower0);
-    // Print("lower1: ", lower1);
 
     double p0 = iClose(symbolArray[i].symbol, symbolArray[i].timeframe[j], 0);
     double p1 = iClose(symbolArray[i].symbol, symbolArray[i].timeframe[j], 1);
@@ -878,13 +886,115 @@ void OpenPosition()
 
 bool FilterOpenPosition(int n)
 {
-    CPositionInfo pos;
+
     string symbol = symbolArray[n].symbol;
 
     if (!FilterOneOrderLimitType(n))
         return false;
 
+    // if (!FilterMaxOrder(n))
+    //     return false;
+
     // Hitung jumlah posisi yang sudah ada untuk symbol ini
+
+    return true;
+}
+bool FilterOneOrderLimitType(int n)
+{
+    CPositionInfo pos;
+    string symbol = symbolArray[n].symbol;
+
+    if (one_order_type == ENUM_ONE_ORDER_TYPE::DISABLE)
+        return true;
+
+    switch (one_order_type)
+    {
+    case ONE_ORDER_PER_SYMBOL:
+        for (int i = 0; i < PositionsTotal(); i++)
+        {
+            if (pos.SelectByIndex(i))
+                if (pos.Symbol() == symbol)
+                    return false;
+        }
+        break;
+
+    case ONE_ORDER_TOTAL_POSITION:
+        if (PositionsTotal() > 0)
+            return false;
+        break;
+
+    case ONE_ORDER_MAGIC_NUMBER_SYMBOL:
+        for (int i = 0; i < PositionsTotal(); i++)
+        {
+            if (pos.SelectByIndex(i))
+                if (pos.Symbol() == symbol && pos.Magic() == magic_number)
+                    return false;
+        }
+        break;
+
+    case ONE_ORDER_MAGIC_NUMBER_SYMBOL_TOTAL_POSITION:
+        for (int i = 0; i < PositionsTotal(); i++)
+        {
+            if (pos.SelectByIndex(i))
+                if (pos.Magic() == magic_number)
+                    return false;
+        }
+        break;
+
+    case ONE_ORDER_PER_TIMEFRAME_SYMBOL_MAGIC_NUMBER:
+        for (int i = 0; i < PositionsTotal(); i++)
+        {
+            if (pos.SelectByIndex(i))
+            {
+                if (pos.Symbol() == symbol && pos.Magic() == magic_number)
+                {
+                    // Cek apakah order dibuka pada timeframe yang sama
+                    datetime pos_time = pos.Time();
+                    datetime bar_time = iTime(symbol, one_order_timeframe, 0);
+
+                    if (pos_time >= bar_time)
+                        return false; // Order sudah ada dalam timeframe ini
+                }
+            }
+        }
+        break;
+    case ORDER_MAX_CUSTOM:
+
+        if (max_order > 0 || max_order_total > 0)
+        {
+            int total_positions = 0;
+            for (int i = 0; i < PositionsTotal(); i++)
+            {
+                if (pos.SelectByIndex(i))
+                {
+                    if (pos.Symbol() == symbol)
+                    {
+                        total_positions++;
+                    }
+                }
+            }
+
+            // Jika jumlah posisi sudah mencapai max_order
+            if (total_positions >= max_order)
+            {
+                if (debug == ON)
+                    Print("Filter: ", symbol, " sudah mencapai max order (", max_order, ")");
+                return false;
+            }
+            if (PositionsTotal() >= max_order_total)
+                return false;
+        }
+
+        break;
+    }
+
+    return true;
+}
+
+bool FilterMaxOrder(int n)
+{
+    CPositionInfo pos;
+    string symbol = symbolArray[n].symbol;
     int total_positions = 0;
     int total_positions_total = 0;
     if (max_order > 0 || max_order_total > 0)
@@ -910,48 +1020,95 @@ bool FilterOpenPosition(int n)
         if (max_order_total >= PositionsTotal())
             return false;
     }
-
     return true;
 }
-bool FilterOneOrderLimitType(int n)
-{
-    CPositionInfo pos;
-    string symbol = symbolArray[n].symbol;
 
-    // Jika disabled, tidak perlu cek
-    if (one_order_type == ENUM_ONE_ORDER_TYPE::DISABLE)
-        return true;
-    // Cek berdasarkan tipe one order
-    switch (one_order_type)
+void HiddenTP_SL()
+{
+    if (InpStopLoss == 0 && InpTakeProfit == 0)
+        return;
+
+    CTrade trade;
+    trade.SetExpertMagicNumber(magic_number);
+    CPositionInfo pos;
+
+    for (int i = 0; i < PositionsTotal(); i++)
     {
-    case ONE_ORDER_PER_SYMBOL:
-        for (int i = 0; i < PositionsTotal(); i++)
+        if (!pos.SelectByIndex(i))
+            continue;
+
+        if (pos.Magic() != magic_number)
+            continue;
+
+        string symbol = pos.Symbol();
+        double entry_price = pos.PriceOpen();
+        double current_price = pos.PriceCurrent();
+        double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+        double floating_points = 0;
+
+        if (pos.PositionType() == POSITION_TYPE_BUY)
         {
-            if (pos.SelectByIndex(i))
-                if (pos.Symbol() == symbol)
-                    return false; // Sudah ada order untuk symbol ini
+            floating_points = (current_price - entry_price) / point;
+
+            // Cek SL jika diaktifkan
+            if (InpStopLoss > 0 && (int)floating_points <= -InpStopLoss)
+            {
+                if (trade.PositionClose(pos.Ticket()))
+                {
+                    if (debug == ON)
+                        Print("Hidden SL: Close BUY position ", symbol,
+                              " Loss: ", floating_points, " points");
+                }
+            }
+
+            // Cek TP jika diaktifkan
+            if (InpTakeProfit > 0 && (int)floating_points >= InpTakeProfit)
+            {
+                if (trade.PositionClose(pos.Ticket()))
+                {
+                    if (debug == ON)
+                        Print("Hidden TP: Close BUY position ", symbol,
+                              " Profit: ", floating_points, " points");
+                }
+            }
         }
-        break;
-    case ONE_ORDER_TOTAL_POSITION:
-        if (PositionsTotal() > 0)
-            return false; // Sudah ada posisi terbuka
-        break;
-    case ONE_ORDER_MAGIC_NUMBER_SYMBOL:
-        for (int i = 0; i < PositionsTotal(); i++)
+        else if (pos.PositionType() == POSITION_TYPE_SELL)
         {
-            if (pos.SelectByIndex(i))
-                if (pos.Symbol() == symbol && pos.Magic() == magic_number)
-                    return false; // Sudah ada order dengan magic number ini
+            floating_points = (entry_price - current_price) / point;
+
+            // Cek SL jika diaktifkan
+            if (InpStopLoss > 0 && floating_points <= -InpStopLoss)
+            {
+                if (trade.PositionClose(pos.Ticket()))
+                {
+                    if (debug == ON)
+                        Print("Hidden SL: Close SELL position ", symbol,
+                              " Loss: ", floating_points, " points");
+                }
+            }
+
+            // Cek TP jika diaktifkan
+            if (InpTakeProfit > 0 && floating_points >= InpTakeProfit)
+            {
+                if (trade.PositionClose(pos.Ticket()))
+                {
+                    if (debug == ON)
+                        Print("Hidden TP: Close SELL position ", symbol,
+                              " Profit: ", floating_points, " points");
+                }
+            }
         }
-        break;
-    case ONE_ORDER_MAGIC_NUMBER_SYMBOL_TOTAL_POSITION:
-        for (int i = 0; i < PositionsTotal(); i++)
-        {
-            if (pos.SelectByIndex(i))
-                if (pos.Magic() == magic_number)
-                    return false; // Sudah ada order dengan magic number ini
-        }
-        break;
     }
-    return true; // Boleh open posisi
+}
+
+void TargetOnChart()
+{
+    if (m_targetProfit > 0)
+    {
+        if (IsNewBar(PERIOD_M1))
+        {
+            ShowTargetOnChart();
+            CheckAndCloseAllOrders();
+        }
+    }
 }

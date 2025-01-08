@@ -8,12 +8,14 @@
 #define BUTTON_NAME "closeall"
 double m_savedBalance;
 bool m_isBalanceLoaded;
-int m_targetProfit;
 
 input string _ll = "========== ( SETTING GENERAL) =========="; // ​
 input ENUM_ON_OFF debug = OFF;                                 // Debuging
 input ENUM_ON_OFF power = ON;                                  // Power EA
 input ENUM_STRATEGY_COMBINATION combi_signal = AND;            // Signal Combination
+input int m_targetProfit = 10;                                 // Target Profit Close All Order Dollar
+input int InpStopLoss = 0;                                     // Hidden Stop Loss (in points, 0=off)
+input int InpTakeProfit = 0;                                   // Hidden Take Profit (in points, 0=off)
 
 input string _ll2 = "========== ( SETTING SYMBOL) =========="; // ​
 input ENUM_SYMBOL_TYPE multi_symbol = MULTI_SYMBOL;            // Symbol Type
@@ -27,7 +29,8 @@ input int magic_number = 123456;                                   // Magic Numb
 input string komment = "";                                         // Comment
 
 input string _lll = "======= ( SETTING MAX ORDER / LIMIT ORDER) ======="; // ​
-input ENUM_ONE_ORDER_TYPE one_order_type = ONE_ORDER_PER_SYMBOL;          // One Order Max Type
+input ENUM_ONE_ORDER_TYPE one_order_type = ONE_ORDER_PER_SYMBOL;          // Order Filter / Limit  Type
+input ENUM_TIMEFRAMES one_order_timeframe = PERIOD_D1;                    // One Order Timeframe
 input int max_order = 0;                                                  // Max Order Per Symbol
 input int max_order_total = 0;                                            // Max Order Total
 
@@ -159,7 +162,42 @@ input int bb5_shift = 0;                                                        
 input ENUM_MA_METHOD bb5_method = MODE_SMA;                                      // Method BB
 input ENUM_APPLIED_PRICE bb5_price = PRICE_CLOSE;                                // Price BB
 
-//============================== hELPER FUNCTION ================================
+//=============== FUNGSI PEMBANTU === ==============
+/// <ringkasan>
+/// Memeriksa apakah ada posisi terbuka untuk simbol yang ditentukan.
+/// </ringkasan>
+/// <param name="symbol">Simbol untuk memeriksa posisi terbuka.</param>
+/// <returns>Benar jika ada posisi terbuka untuk simbol yang ditentukan, salah jika tidak.</returns>
+
+bool IsPositionBySymbol(string symbol)
+{
+    bool hasPosition = false;
+    CPositionInfo pos;
+    for (int i = 0; i < PositionsTotal(); i++)
+    {
+        if (pos.SelectByIndex(i))
+        {
+            if (pos.Symbol() == symbol)
+            {
+                hasPosition = true;
+                break;
+            }
+        }
+    }
+    return hasPosition;
+}
+bool IsNewBar(ENUM_TIMEFRAMES timeframe)
+{
+    static datetime last_time = 0;
+    datetime current_time = iTime(NULL, timeframe, 0); //
+    if (current_time != last_time)
+    {
+        last_time = current_time;
+        return true;
+    }
+    return false;
+}
+
 int Digit(string symbol)
 {
     return (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);

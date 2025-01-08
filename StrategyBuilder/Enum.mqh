@@ -18,6 +18,8 @@ enum ENUM_ONE_ORDER_TYPE
     ONE_ORDER_TOTAL_POSITION,                     // One Order Total Position
     ONE_ORDER_MAGIC_NUMBER_SYMBOL,                // One Order Magic Number Symbol
     ONE_ORDER_MAGIC_NUMBER_SYMBOL_TOTAL_POSITION, // One Order Magic Number Total Position
+    ONE_ORDER_PER_TIMEFRAME_SYMBOL_MAGIC_NUMBER,  // One Order Per Timeframe Symbol (Magic Number)
+    ORDER_MAX_CUSTOM,                             // Order Max Custom
     DISABLE                                       // Disable
 };
 enum ENUM_SYMBOL_TYPE
@@ -47,9 +49,9 @@ enum ENUM_STRATEGY_COMBINATION
 enum ENUM_SIGNAL_TYPE
 
 {
-    CROSS,                         // Cross
-    UP_DOWN,                       // Up And Down
-    MA_SIGNAL_UP_DOWN_CURRENTPRICE // Up And Down + Current Price
+    CROSS,   // Cross
+    UP_DOWN, // Up And Down
+    UP_DOWN_REVERSE
 };
 
 enum ENUM_BB_SIGNAL_TYPE
