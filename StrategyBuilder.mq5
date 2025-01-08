@@ -973,48 +973,59 @@ bool FilterGridOrder(int n)
 {
     CPositionInfo pos;
     string symbol = symbolArray[n].symbol;
+
     int total_positions = PositionsTotal();
     int grid_positions = 0;
     double last_position_price = 0;
-    ENUM_POSITION_TYPE grid_direction = POSITION_TYPE_BUY; // Inisialisasi default arah grid
+    datetime latest_position_time = 0;
+    ENUM_POSITION_TYPE grid_direction = POSITION_TYPE_BUY;
     double current_price = SymbolInfoDouble(symbol, one_order_type == ORDER_MODE_GRID_PROFIT ? SYMBOL_ASK : SYMBOL_BID);
 
-    // Menentukan arah grid berdasarkan pengaturan
+    // Set arah grid berdasarkan pengaturan
     switch (grid_direction_setting)
     {
     case GRID_BUY_ONLY:
         grid_direction = POSITION_TYPE_BUY;
         break;
+
     case GRID_SELL_ONLY:
         grid_direction = POSITION_TYPE_SELL;
         break;
+
     case GRID_AUTO_FOLLOW:
     case GRID_ALL:
-        // Akan ditentukan oleh posisi pertama yang ditemukan
+        // Mencari posisi terakhir berdasarkan waktu
+        for (int i = 0; i < total_positions; i++)
+        {
+            if (!pos.SelectByIndex(i) || pos.Symbol() != symbol || pos.Magic() != magic_number)
+                continue;
+
+            if (latest_position_time == 0 || pos.Time() > latest_position_time)
+            {
+                latest_position_time = pos.Time();
+                grid_direction = pos.PositionType();
+            }
+        }
         break;
     }
 
-    // Loop melalui semua posisi terbuka
+    // Loop untuk menghitung posisi grid dan harga terakhir
     for (int i = 0; i < total_positions; i++)
     {
-        // Memeriksa apakah posisi sesuai dengan simbol dan magic number
         if (!pos.SelectByIndex(i) || pos.Symbol() != symbol || pos.Magic() != magic_number)
             continue;
 
-        // Menentukan arah grid untuk GRID_AUTO_FOLLOW dan GRID_ALL
-        if (grid_positions == 0)
+        // Jika mode auto follow, hanya izinkan posisi yang searah dengan posisi terakhir
+        if (grid_direction_setting == GRID_AUTO_FOLLOW && pos.PositionType() != grid_direction)
         {
-            if (grid_direction_setting == GRID_AUTO_FOLLOW || grid_direction_setting == GRID_ALL)
-                grid_direction = pos.PositionType();
-        }
-        else if (pos.PositionType() != grid_direction && grid_direction_setting != GRID_ALL)
-        {
-            continue; // Abaikan posisi yang tidak sesuai dengan arah grid
+            if (debug == ON)
+                Print("Filter: Arah posisi tidak sesuai dengan auto follow");
+            return false;
         }
 
         grid_positions++;
 
-        // Menentukan harga posisi terakhir berdasarkan mode grid
+        // Update harga posisi terakhir
         if (one_order_type == ORDER_MODE_GRID_PROFIT)
         {
             if (grid_direction == POSITION_TYPE_BUY)
@@ -1029,17 +1040,9 @@ bool FilterGridOrder(int n)
             else
                 last_position_price = MathMax(last_position_price, pos.PriceOpen());
         }
-
-        // Memeriksa batasan timeframe jika diperlukan
-        if (one_order_timeframe != PERIOD_CURRENT && pos.Time() >= iTime(symbol, one_order_timeframe, 0))
-        {
-            if (debug == ON)
-                Print("Filter: ", symbol, " sudah ada order pada timeframe ini");
-            return false;
-        }
     }
 
-    // Memeriksa apakah jumlah posisi grid sudah mencapai batas maksimum
+    // Cek jumlah maksimum grid
     if (grid_positions >= max_grid)
     {
         if (debug == ON)
@@ -1047,10 +1050,9 @@ bool FilterGridOrder(int n)
         return false;
     }
 
-    // Jika ada posisi grid, periksa jarak dan kondisi harga
+    // Cek jarak dan kondisi harga untuk posisi yang sudah ada
     if (grid_positions > 0)
     {
-        // Memeriksa jarak antara harga saat ini dan posisi terakhir
         double point_distance = MathAbs(current_price - last_position_price) / Point();
         if (point_distance < grid_min)
         {
@@ -1059,8 +1061,9 @@ bool FilterGridOrder(int n)
             return false;
         }
 
-        // Memeriksa kondisi harga berdasarkan mode grid dan arah
-        bool price_condition = (one_order_type == ORDER_MODE_GRID_PROFIT) ? (grid_direction == POSITION_TYPE_BUY ? current_price > last_position_price : current_price < last_position_price) : (grid_direction == POSITION_TYPE_BUY ? current_price < last_position_price : current_price > last_position_price);
+        bool price_condition = (one_order_type == ORDER_MODE_GRID_PROFIT)
+                                   ? (grid_direction == POSITION_TYPE_BUY ? current_price > last_position_price : current_price < last_position_price)
+                                   : (grid_direction == POSITION_TYPE_BUY ? current_price < last_position_price : current_price > last_position_price);
 
         if (!price_condition)
         {
@@ -1071,7 +1074,6 @@ bool FilterGridOrder(int n)
         }
     }
 
-    // Jika semua kondisi terpenuhi, boleh membuka posisi baru
     return true;
 }
 
