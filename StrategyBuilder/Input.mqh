@@ -29,10 +29,13 @@ input int magic_number = 123456;                                   // Magic Numb
 input string komment = "";                                         // Comment
 
 input string _lll = "======= ( SETTING MAX ORDER / LIMIT ORDER) ======="; // ​
-input ENUM_ONE_ORDER_TYPE one_order_type = ONE_ORDER_PER_SYMBOL;          // Order Filter / Limit  Type
-input ENUM_TIMEFRAMES one_order_timeframe = PERIOD_D1;                    // One Order Timeframe
+input ENUM_ONE_ORDER_TYPE one_order_type = ONE_ORDER_PER_SYMBOL;          // Mode Order dan Limit Order
+input ENUM_GRID_DIRECTION grid_direction = GRID_ALL;                      // Mode Grid Jika Diaktifkan
+input ENUM_TIMEFRAMES one_order_timeframe = PERIOD_D1;                    // Timeframe Mode Order
 input int max_order = 0;                                                  // Max Order Per Symbol
 input int max_order_total = 0;                                            // Max Order Total
+input int grid_min = 200;                                                 // Grid Min Jarak Order (Profit / Loss Point)
+input int max_grid = 5;                                                   // Position Max Grid
 
 input string _sdf = "========== ( SETTING FILTER) =========="; // ​
 input int max_spread = 35;                                     // Max Spread (0 = No Max Spread)

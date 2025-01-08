@@ -12,6 +12,14 @@ enum ENUM_DAY_INDO
     Disable
 
 };
+enum ENUM_GRID_DIRECTION
+{
+    GRID_ALL,        // Buy dan Sell
+    GRID_BUY_ONLY,   // Buy Only
+    GRID_SELL_ONLY,  // Sell Only
+    GRID_AUTO_FOLLOW // Auto Follow First Position
+};
+
 enum ENUM_ONE_ORDER_TYPE
 {
     ONE_ORDER_PER_SYMBOL,                         // One Order Per Symbol
@@ -20,6 +28,8 @@ enum ENUM_ONE_ORDER_TYPE
     ONE_ORDER_MAGIC_NUMBER_SYMBOL_TOTAL_POSITION, // One Order Magic Number Total Position
     ONE_ORDER_PER_TIMEFRAME_SYMBOL_MAGIC_NUMBER,  // One Order Per Timeframe Symbol (Magic Number)
     ORDER_MAX_CUSTOM,                             // Order Max Custom
+    ORDER_MODE_GRID_PROFIT,                       // Order Mode Grid Profit
+    ORDER_MODE_GRID_LOSS,                         // Order Mode Grid Loss
     DISABLE                                       // Disable
 };
 enum ENUM_SYMBOL_TYPE
