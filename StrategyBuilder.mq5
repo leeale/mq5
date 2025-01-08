@@ -86,19 +86,6 @@ void OnTimer()
             continue;
         }
         CalcSignal(n);
-
-        if (debug == 0)
-        {
-
-            for (int j = 0; j < totalHandles; j++)
-            {
-                if (symbolArray[n].handle[j] != INVALID_HANDLE)
-                {
-                    if (symbolArray[n].signal[j] != 0)
-                        Print("Symbol: ", symbol, " Handle: ", symbolArray[n].handle[j], " Signal: ", symbolArray[n].signal[j]);
-                }
-            }
-        }
     }
     UpdateFinalSignal();
     // GetDataSymbol();
@@ -901,253 +888,190 @@ bool FilterOpenPosition(int n)
 }
 bool FilterOneOrderLimitType(int n)
 {
-    CPositionInfo pos;
-    string symbol = symbolArray[n].symbol;
-
-    // Ambil harga sekarang sesuai arah trading
-
     if (one_order_type == ENUM_ONE_ORDER_TYPE::DISABLE)
         return true;
+
+    CPositionInfo pos;
+    string symbol = symbolArray[n].symbol;
+    int total_positions = PositionsTotal();
 
     switch (one_order_type)
     {
     case ONE_ORDER_PER_SYMBOL:
-        for (int i = 0; i < PositionsTotal(); i++)
+        for (int i = 0; i < total_positions; i++)
         {
-            if (pos.SelectByIndex(i))
-                if (pos.Symbol() == symbol)
-                    return false;
+            if (pos.SelectByIndex(i) && pos.Symbol() == symbol)
+                return false;
         }
         break;
 
     case ONE_ORDER_TOTAL_POSITION:
-        if (PositionsTotal() > 0)
-            return false;
-        break;
+        return total_positions == 0;
 
     case ONE_ORDER_MAGIC_NUMBER_SYMBOL:
-        for (int i = 0; i < PositionsTotal(); i++)
+        for (int i = 0; i < total_positions; i++)
         {
-            if (pos.SelectByIndex(i))
-                if (pos.Symbol() == symbol && pos.Magic() == magic_number)
-                    return false;
+            if (pos.SelectByIndex(i) && pos.Symbol() == symbol && pos.Magic() == magic_number)
+                return false;
         }
         break;
 
     case ONE_ORDER_MAGIC_NUMBER_SYMBOL_TOTAL_POSITION:
-        for (int i = 0; i < PositionsTotal(); i++)
+        for (int i = 0; i < total_positions; i++)
         {
-            if (pos.SelectByIndex(i))
-                if (pos.Magic() == magic_number)
-                    return false;
+            if (pos.SelectByIndex(i) && pos.Magic() == magic_number)
+                return false;
         }
         break;
 
     case ONE_ORDER_PER_TIMEFRAME_SYMBOL_MAGIC_NUMBER:
-        for (int i = 0; i < PositionsTotal(); i++)
+    {
+        datetime bar_time = iTime(symbol, one_order_timeframe, 0);
+        for (int i = 0; i < total_positions; i++)
         {
-            if (pos.SelectByIndex(i))
-            {
-                if (pos.Symbol() == symbol && pos.Magic() == magic_number)
-                {
-                    // Cek apakah order dibuka pada timeframe yang sama
-                    datetime pos_time = pos.Time();
-                    datetime bar_time = iTime(symbol, one_order_timeframe, 0);
-
-                    if (pos_time >= bar_time)
-                        return false; // Order sudah ada dalam timeframe ini
-                }
-            }
+            if (pos.SelectByIndex(i) && pos.Symbol() == symbol && pos.Magic() == magic_number && pos.Time() >= bar_time)
+                return false;
         }
-        break;
-    case ORDER_MAX_CUSTOM:
+    }
+    break;
 
+    case ORDER_MAX_CUSTOM:
         if (max_order > 0 || max_order_total > 0)
         {
-            int total_positions = 0;
-            for (int i = 0; i < PositionsTotal(); i++)
+            int symbol_positions = 0;
+            for (int i = 0; i < total_positions; i++)
             {
-                if (pos.SelectByIndex(i))
-                {
-                    if (pos.Symbol() == symbol)
-                    {
-                        total_positions++;
-                    }
-                }
+                if (pos.SelectByIndex(i) && pos.Symbol() == symbol)
+                    symbol_positions++;
             }
-
-            // Jika jumlah posisi sudah mencapai max_order
-            if (total_positions >= max_order)
+            if (symbol_positions >= max_order || total_positions >= max_order_total)
             {
                 if (debug == ON)
-                    Print("Filter: ", symbol, " sudah mencapai max order (", max_order, ")");
+                    Print("Filter: ", symbol, " sudah mencapai max order (", max_order, ") atau max total (", max_order_total, ")");
                 return false;
             }
-            if (PositionsTotal() >= max_order_total)
-                return false;
         }
-
         break;
 
     case ORDER_MODE_GRID_PROFIT:
     case ORDER_MODE_GRID_LOSS:
+        return FilterGridOrder(n);
+        break;
+    }
+
+    return true;
+}
+
+/**
+ *Memfilter pesanan perdagangan grid berdasarkan kondisi dan parameter yang ditentukan.
+ *Memeriksa batas posisi, arah grid, jarak harga, dan batasan jangka waktu.
+ *
+ *@param n Indeks simbol di simbolArray untuk diperiksa
+ *@return true jika posisi grid baru dapat dibuka, false jika tidak
+ */
+bool FilterGridOrder(int n)
+{
+    CPositionInfo pos;
+    string symbol = symbolArray[n].symbol;
+    int total_positions = PositionsTotal();
+    int grid_positions = 0;
+    double last_position_price = 0;
+    ENUM_POSITION_TYPE grid_direction = POSITION_TYPE_BUY; // Inisialisasi default arah grid
+    double current_price = SymbolInfoDouble(symbol, one_order_type == ORDER_MODE_GRID_PROFIT ? SYMBOL_ASK : SYMBOL_BID);
+
+    // Menentukan arah grid berdasarkan pengaturan
+    switch (grid_direction_setting)
     {
-        int total_posisi = 0;
-        double harga_posisi_terakhir = 0;
-        double harga_sekarang;
-        if (one_order_type == ORDER_MODE_GRID_PROFIT)
-            harga_sekarang = SymbolInfoDouble(symbol, SYMBOL_ASK);
-        else if (one_order_type == ORDER_MODE_GRID_LOSS)
-            harga_sekarang = SymbolInfoDouble(symbol, SYMBOL_BID);
-        else
-            // Untuk mode lain gunakan BID sebagai default
-            harga_sekarang = SymbolInfoDouble(symbol, SYMBOL_BID);
+    case GRID_BUY_ONLY:
+        grid_direction = POSITION_TYPE_BUY;
+        break;
+    case GRID_SELL_ONLY:
+        grid_direction = POSITION_TYPE_SELL;
+        break;
+    case GRID_AUTO_FOLLOW:
+    case GRID_ALL:
+        // Akan ditentukan oleh posisi pertama yang ditemukan
+        break;
+    }
 
-        ENUM_POSITION_TYPE arah_trading = POSITION_TYPE_BUY; // untuk menyimpan arah trading yang ditemukan
+    // Loop melalui semua posisi terbuka
+    for (int i = 0; i < total_positions; i++)
+    {
+        // Memeriksa apakah posisi sesuai dengan simbol dan magic number
+        if (!pos.SelectByIndex(i) || pos.Symbol() != symbol || pos.Magic() != magic_number)
+            continue;
 
-        // Hitung jumlah posisi dan cari harga posisi terakhir
-        for (int i = 0; i < PositionsTotal(); i++)
+        // Menentukan arah grid untuk GRID_AUTO_FOLLOW dan GRID_ALL
+        if (grid_positions == 0)
         {
-            if (pos.SelectByIndex(i))
-            {
-                if (pos.Symbol() == symbol && pos.Magic() == magic_number)
-                {
-                    // Cek arah trading yang diizinkan
-                    if ((grid_direction == GRID_BUY_ONLY && pos.PositionType() == POSITION_TYPE_SELL) ||
-                        (grid_direction == GRID_SELL_ONLY && pos.PositionType() == POSITION_TYPE_BUY) ||
-                        (grid_direction == GRID_AUTO_FOLLOW && total_posisi == 0)) // Simpan arah trading pertama
-                    {
-                        if (grid_direction == GRID_AUTO_FOLLOW && total_posisi == 0)
-                            arah_trading = pos.PositionType(); // Simpan arah dari posisi pertama
-
-                        if (pos.PositionType() != arah_trading)
-                            continue;
-                    }
-                    total_posisi++;
-                    // Cek tipe order dan arah grid
-                    if (one_order_type == ORDER_MODE_GRID_PROFIT)
-                    {
-
-                        if (pos.PositionType() == POSITION_TYPE_BUY)
-                        {
-                            if (harga_posisi_terakhir == 0 || pos.PriceOpen() > harga_posisi_terakhir)
-                                harga_posisi_terakhir = pos.PriceOpen();
-                        }
-                        else // POSITION_TYPE_SELL
-                        {
-                            if (harga_posisi_terakhir == 0 || pos.PriceOpen() < harga_posisi_terakhir)
-                            {
-                                harga_posisi_terakhir = pos.PriceOpen();
-                                if (debug == ON)
-                                    Print("Harga posisi terakhir: ", harga_posisi_terakhir);
-                            }
-                        }
-                    }
-                    else // ORDER_MODE_GRID_LOSS
-                    {
-                        // Untuk grid loss:
-                        // - Jika BUY, cari harga tertinggi untuk buka posisi baru di bawahnya
-                        // - Jika SELL, cari harga terendah untuk buka posisi baru di atasnya
-                        if (pos.PositionType() == POSITION_TYPE_BUY)
-                        {
-                            if (harga_posisi_terakhir == 0 || pos.PriceOpen() < harga_posisi_terakhir)
-                            {
-                                harga_posisi_terakhir = pos.PriceOpen();
-                                if (debug == ON)
-                                    Print("Harga posisi terakhir: Buy Grid Loss", harga_posisi_terakhir);
-                            }
-                        }
-                        else // POSITION_TYPE_SELL
-                        {
-                            if (harga_posisi_terakhir == 0 || pos.PriceOpen() > harga_posisi_terakhir)
-                            {
-                                harga_posisi_terakhir = pos.PriceOpen();
-                                if (debug == ON)
-                                    Print("Harga posisi terakhir: Sell Grid Loss", harga_posisi_terakhir);
-                            }
-                        }
-                    }
-                }
-            }
+            if (grid_direction_setting == GRID_AUTO_FOLLOW || grid_direction_setting == GRID_ALL)
+                grid_direction = pos.PositionType();
+        }
+        else if (pos.PositionType() != grid_direction && grid_direction_setting != GRID_ALL)
+        {
+            continue; // Abaikan posisi yang tidak sesuai dengan arah grid
         }
 
-        // Cek maksimum grid posisi
-        if (total_posisi >= max_grid)
+        grid_positions++;
+
+        // Menentukan harga posisi terakhir berdasarkan mode grid
+        if (one_order_type == ORDER_MODE_GRID_PROFIT)
+        {
+            if (grid_direction == POSITION_TYPE_BUY)
+                last_position_price = MathMax(last_position_price, pos.PriceOpen());
+            else
+                last_position_price = (last_position_price == 0) ? pos.PriceOpen() : MathMin(last_position_price, pos.PriceOpen());
+        }
+        else // ORDER_MODE_GRID_LOSS
+        {
+            if (grid_direction == POSITION_TYPE_BUY)
+                last_position_price = (last_position_price == 0) ? pos.PriceOpen() : MathMin(last_position_price, pos.PriceOpen());
+            else
+                last_position_price = MathMax(last_position_price, pos.PriceOpen());
+        }
+
+        // Memeriksa batasan timeframe jika diperlukan
+        if (one_order_timeframe != PERIOD_CURRENT && pos.Time() >= iTime(symbol, one_order_timeframe, 0))
         {
             if (debug == ON)
-                Print("Filter: ", symbol, " sudah mencapai max grid (", max_grid, ")");
+                Print("Filter: ", symbol, " sudah ada order pada timeframe ini");
+            return false;
+        }
+    }
+
+    // Memeriksa apakah jumlah posisi grid sudah mencapai batas maksimum
+    if (grid_positions >= max_grid)
+    {
+        if (debug == ON)
+            Print("Filter: ", symbol, " sudah mencapai max grid (", max_grid, ")");
+        return false;
+    }
+
+    // Jika ada posisi grid, periksa jarak dan kondisi harga
+    if (grid_positions > 0)
+    {
+        // Memeriksa jarak antara harga saat ini dan posisi terakhir
+        double point_distance = MathAbs(current_price - last_position_price) / Point();
+        if (point_distance < grid_min)
+        {
+            if (debug == ON)
+                Print("Filter: ", symbol, " jarak grid belum mencukupi (", point_distance, " < ", grid_min, ")");
             return false;
         }
 
-        // Jika belum ada posisi, boleh buka posisi pertama
-        if (total_posisi == 0)
-            return true;
+        // Memeriksa kondisi harga berdasarkan mode grid dan arah
+        bool price_condition = (one_order_type == ORDER_MODE_GRID_PROFIT) ? (grid_direction == POSITION_TYPE_BUY ? current_price > last_position_price : current_price < last_position_price) : (grid_direction == POSITION_TYPE_BUY ? current_price < last_position_price : current_price > last_position_price);
 
-        // Hitung jarak point
-        double jarak_point = MathAbs(harga_sekarang - harga_posisi_terakhir) / Point();
-
-        // Cek jarak minimal antar posisi
-        if (jarak_point < grid_min)
+        if (!price_condition)
         {
             if (debug == ON)
-                Print("Filter: ", symbol, " jarak grid belum mencukupi (", jarak_point, " < ", grid_min, ")");
+                Print("Filter Grid ", (one_order_type == ORDER_MODE_GRID_PROFIT ? "Profit" : "Loss"), " ",
+                      (grid_direction == POSITION_TYPE_BUY ? "BUY" : "SELL"), ": Harga belum memenuhi syarat");
             return false;
         }
-
-        // Cek timeframe jika diatur
-        if (one_order_timeframe != PERIOD_CURRENT)
-        {
-            datetime waktu_bar_sekarang = iTime(symbol, one_order_timeframe, 0);
-            if (pos.Time() >= waktu_bar_sekarang)
-            {
-                if (debug == ON)
-                    Print("Filter: ", symbol, " sudah ada order pada timeframe ini");
-                return false;
-            }
-        }
-
-        // Tambahkan pengecekan khusus untuk GRID_LOSS
-        if (one_order_type == ORDER_MODE_GRID_LOSS)
-        {
-            // Untuk BUY: hanya buka posisi jika harga sekarang LEBIH RENDAH dari posisi terakhir
-            if (arah_trading == POSITION_TYPE_BUY && harga_sekarang >= harga_posisi_terakhir)
-            {
-                if (debug == ON)
-                    Print("Filter Grid Loss BUY: Harga belum memenuhi syarat");
-                return false;
-            }
-
-            // Untuk SELL: hanya buka posisi jika harga sekarang LEBIH TINGGI dari posisi terakhir
-            if (arah_trading == POSITION_TYPE_SELL && harga_sekarang <= harga_posisi_terakhir)
-            {
-                if (debug == ON)
-                    Print("Filter Grid Loss SELL: Harga belum memenuhi syarat");
-                return false;
-            }
-        }
-        // Pengecekan sebelum return true
-        if (one_order_type == ORDER_MODE_GRID_PROFIT)
-        {
-            // Untuk BUY: buka posisi jika harga sekarang LEBIH TINGGI dari posisi terakhir
-            if (arah_trading == POSITION_TYPE_BUY && harga_sekarang <= harga_posisi_terakhir)
-            {
-                if (debug == ON)
-                    Print("Filter Grid Profit BUY: Harga belum memenuhi syarat");
-                return false;
-            }
-
-            // Untuk SELL: buka posisi jika harga sekarang LEBIH RENDAH dari posisi terakhir
-            if (arah_trading == POSITION_TYPE_SELL && harga_sekarang >= harga_posisi_terakhir)
-            {
-                if (debug == ON)
-                    Print("Filter Grid Profit SELL: Harga belum memenuhi syarat");
-                return false;
-            }
-        }
-    }
-    break;
     }
 
+    // Jika semua kondisi terpenuhi, boleh membuka posisi baru
     return true;
 }
 
@@ -1271,4 +1195,26 @@ void TargetOnChart()
             CheckAndCloseAllOrders();
         }
     }
+}
+
+string Helper;
+bool cekGridProfitCriteria(ENUM_POSITION_TYPE arah_trading, double harga_sekarang, double harga_posisi_terakhir)
+{
+    if (arah_trading == POSITION_TYPE_BUY && harga_sekarang <= harga_posisi_terakhir)
+    {
+        if (debug == ON)
+        {
+            Print("Filter Grid Profit BUY: Harga belum memenuhi syarat");
+        }
+        return false;
+    }
+    if (arah_trading == POSITION_TYPE_SELL && harga_sekarang >= harga_posisi_terakhir)
+    {
+        if (debug == ON)
+        {
+            Print("Filter Grid Profit SELL: Harga belum memenuhi syarat");
+        }
+        return false;
+    }
+    return true;
 }

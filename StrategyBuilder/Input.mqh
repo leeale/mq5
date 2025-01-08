@@ -30,7 +30,7 @@ input string komment = "";                                         // Comment
 
 input string _lll = "======= ( SETTING MAX ORDER / LIMIT ORDER) ======="; // ​
 input ENUM_ONE_ORDER_TYPE one_order_type = ONE_ORDER_PER_SYMBOL;          // Mode Order dan Limit Order
-input ENUM_GRID_DIRECTION grid_direction = GRID_ALL;                      // Mode Grid Jika Diaktifkan
+input ENUM_GRID_DIRECTION grid_direction_setting = GRID_ALL;              // Mode Grid Jika Diaktifkan
 input ENUM_TIMEFRAMES one_order_timeframe = PERIOD_D1;                    // Timeframe Mode Order
 input int max_order = 0;                                                  // Max Order Per Symbol
 input int max_order_total = 0;                                            // Max Order Total
@@ -166,11 +166,6 @@ input ENUM_MA_METHOD bb5_method = MODE_SMA;                                     
 input ENUM_APPLIED_PRICE bb5_price = PRICE_CLOSE;                                // Price BB
 
 //=============== FUNGSI PEMBANTU === ==============
-/// <ringkasan>
-/// Memeriksa apakah ada posisi terbuka untuk simbol yang ditentukan.
-/// </ringkasan>
-/// <param name="symbol">Simbol untuk memeriksa posisi terbuka.</param>
-/// <returns>Benar jika ada posisi terbuka untuk simbol yang ditentukan, salah jika tidak.</returns>
 
 bool IsPositionBySymbol(string symbol)
 {
@@ -199,43 +194,6 @@ bool IsNewBar(ENUM_TIMEFRAMES timeframe)
         return true;
     }
     return false;
-}
-
-int Digit(string symbol)
-{
-    return (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
-}
-double Point(string symbol)
-{
-    return SymbolInfoDouble(symbol, SYMBOL_POINT);
-}
-double Ask(string symbol)
-{
-    return SymbolInfoDouble(symbol, SYMBOL_ASK);
-}
-double Bid(string symbol)
-{
-    return SymbolInfoDouble(symbol, SYMBOL_BID);
-}
-double Noramldouble(double value, string symbol)
-{
-    return NormalizeDouble(value, Digit(symbol));
-}
-double SlBuy(string symbol, int sl)
-{
-    return Ask(symbol) - sl * Point(symbol);
-}
-double SlSell(string symbol, int sl)
-{
-    return Bid(symbol) + sl * Point(symbol);
-}
-int Spread(string symbol)
-{
-    return (int)SymbolInfoInteger(symbol, SYMBOL_SPREAD);
-}
-double SpreadPoint(string symbol)
-{
-    return Spread(symbol) * Point(symbol);
 }
 
 void CloseAllOrders()
