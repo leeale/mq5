@@ -15,7 +15,6 @@ struct symbolInfo
     bool isSell[];
     ENUM_TIMEFRAMES timeframe[];
     int signal_type[];
-    //  int signal_type_BB[];
 };
 symbolInfo symbolArray[];
 // variable Global
@@ -757,173 +756,137 @@ void GetDataSymbol()
 void OpenPosition()
 {
     CTrade trade;
-    trade.SetExpertMagicNumber(magic_number);
+    trade.SetExpertMagicNumber(MAGIC_NUMBER);
 
     for (int i = 0; i < totalSymbols; i++)
     {
-        if (symbolArray[i].finalsignal != 0)
+        if (symbolArray[i].finalsignal == 0)
+            continue;
+
+        if (!FilterOrder(i))
+            continue;
+
+        string symbol = symbolArray[i].symbol;
+        double ask, bid;
+
+        if (!SymbolInfoDouble(symbol, SYMBOL_ASK, ask) || !SymbolInfoDouble(symbol, SYMBOL_BID, bid))
         {
-            if (!FilterOpenPosition(i))
-                continue;
+            Print("Error getting price for ", symbol);
+            continue;
+        }
 
-            string symbol = symbolArray[i].symbol;
-            double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
-            double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
-            double spread = SymbolInfoInteger(symbol, SYMBOL_SPREAD) * SymbolInfoDouble(symbol, SYMBOL_POINT);
-            int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
-            double min_sl = SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL) * SymbolInfoDouble(symbol, SYMBOL_POINT);
+        double spread = ask - bid;
+        int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+        double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+        double min_sl = SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL) * point;
+        double sl = 0, tp = 0;
 
-            double sl = 0, tp = 0;
-
-            bool retry = false;
-            int loop = 0;
-            do
+        if (Stoploss > 0)
+        {
+            if (symbolArray[i].finalsignal == 1)
             {
-                loop++;
-                if (loop > 10)
-                {
-                    Print("Retry Open Position: ", symbol, " Loop: ", loop, "GAGAL OPEN POISITION");
-                    break;
-                }
-                if (Stoploss > 0)
-                {
-                    double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
-                    if (symbolArray[i].finalsignal == 1)
-                    {
-                        sl = ask - (Stoploss * point);
-                        if (ask - sl < min_sl)
-                            sl = ask - min_sl;
-                        if (retry)
-                            sl = ask - (min_sl + spread);
-                    }
-                    else
-                    {
-                        sl = bid + (Stoploss * point);
-                        if (sl - bid < min_sl)
-                            sl = bid + min_sl;
-                        if (retry)
-                            sl = bid + (min_sl + spread);
-                    }
-                }
+                sl = ask - (Stoploss * point) - spread;
+                if (ask - sl < min_sl)
+                    sl = ask - min_sl - spread;
+            }
+            else
+            {
+                sl = bid + (Stoploss * point) + spread;
+                if (sl - bid < min_sl)
+                    sl = bid + min_sl + spread;
+            }
+        }
 
-                if (Takeprofit > 0)
-                {
-                    double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
-                    if (symbolArray[i].finalsignal == 1)
-                        tp = ask + (Takeprofit * point);
-                    else
-                        tp = bid - (Takeprofit * point);
-                }
+        if (Takeprofit > 0)
+        {
+            if (symbolArray[i].finalsignal == 1)
+                tp = ask + (Takeprofit * point);
+            else
+                tp = bid - (Takeprofit * point);
+        }
 
-                if (symbolArray[i].finalsignal == 1)
-                {
-                    bool order = trade.Buy(lot,
-                                           symbol,
-                                           ask,
-                                           sl,
-                                           tp,
-                                           komment);
-                    if (order)
-                    {
-                        if (debug == ON)
-                            Print("Order Buy: ", symbol, " Time Lokal: ", TimeLocal(), " Magic Number: ", MAGIC_NUMBER);
-                        break;
-                    }
-                    else if (debug == ON)
-                    {
-                        int error = GetLastError();
-                        Print("Error Order Buy: ", error);
-                        if (error == 130 && !retry) // Invalid stops
-                        {
-                            retry = true;
-                            continue;
-                        }
-                    }
-                }
-                else if (symbolArray[i].finalsignal == -1)
-                {
-                    bool order = trade.Sell(lot,
-                                            symbol,
-                                            bid,
-                                            sl,
-                                            tp,
-                                            komment);
-                    if (order)
-                    {
-                        if (debug == ON)
-                            Print("Order Sell: ", symbol, " Time Lokal: ", TimeLocal(), " Magic Number: ", MAGIC_NUMBER);
-                        break;
-                    }
-                    else if (debug == ON)
-                    {
-                        int error = GetLastError();
-                        Print("Error Order Sell: ", error);
-                        if (error == 130 && !retry) // Invalid stops
-                        {
-                            retry = true;
-                            continue;
-                        }
-                    }
-                }
-                break;
-            } while (true);
+        bool order;
+        if (symbolArray[i].finalsignal == 1)
+        {
+            order = trade.Buy(lot, symbol, ask, sl, tp);
+            if (order)
+            {
+                if (debug == ON)
+                    Print("Order Buy: ", symbol, " Time Lokal: ", TimeLocal(), " Magic Number: ", MAGIC_NUMBER);
+            }
+            else
+            {
+                if (debug == ON)
+                    Print("Error Order Buy: ", GetLastError());
+            }
+        }
+        else
+        {
+            order = trade.Sell(lot, symbol, bid, sl, tp);
+            if (order)
+            {
+                if (debug == ON)
+                    Print("Order Sell: ", symbol, " Time Lokal: ", TimeLocal(), " Magic Number: ", MAGIC_NUMBER);
+            }
+            else
+            {
+                if (debug == ON)
+                    Print("Error Order Sell: ", GetLastError());
+            }
         }
     }
 }
 
-bool FilterOpenPosition(int n)
+bool FilterOrder(int n)
 {
-
-    string symbol = symbolArray[n].symbol;
-
-    if (!FilterOneOrderLimitType(n))
-        return false;
-
-    // if (!FilterMaxOrder(n))
-    //     return false;
-
-    // Hitung jumlah posisi yang sudah ada untuk symbol ini
-
-    return true;
-}
-bool FilterOneOrderLimitType(int n)
-{
-    if (one_order_type == ENUM_ONE_ORDER_TYPE::DISABLE)
-        return true;
+    // if (one_order_type == ENUM_ONE_ORDER_TYPE::DISABLE)
+    //     return true;
 
     CPositionInfo pos;
     string symbol = symbolArray[n].symbol;
     int total_positions = PositionsTotal();
 
+    if (total_positions == 0) // Kondisi 1: belum ada order sama sekali
+        return true;
+
     switch (one_order_type)
     {
     case ONE_ORDER_PER_SYMBOL:
+    {
         for (int i = 0; i < total_positions; i++)
         {
             if (pos.SelectByIndex(i) && pos.Symbol() == symbol)
                 return false;
         }
         break;
-
+    }
     case ONE_ORDER_TOTAL_POSITION:
-        return total_positions == 0;
-
+    {
+        for (int i = 0; i < total_positions; i++)
+        {
+            if (pos.SelectByIndex(i))
+                return false;
+        }
+        break;
+    }
     case ONE_ORDER_MAGIC_NUMBER_SYMBOL:
+    {
         for (int i = 0; i < total_positions; i++)
         {
             if (pos.SelectByIndex(i) && pos.Symbol() == symbol && pos.Magic() == magic_number)
                 return false;
         }
         break;
-
+    }
     case ONE_ORDER_MAGIC_NUMBER_SYMBOL_TOTAL_POSITION:
+    {
         for (int i = 0; i < total_positions; i++)
         {
             if (pos.SelectByIndex(i) && pos.Magic() == magic_number)
                 return false;
         }
         break;
-
+    }
     case ONE_ORDER_PER_TIMEFRAME_SYMBOL_MAGIC_NUMBER:
     {
         datetime bar_time = iTime(symbol, one_order_timeframe, 0);
@@ -932,179 +895,194 @@ bool FilterOneOrderLimitType(int n)
             if (pos.SelectByIndex(i) && pos.Symbol() == symbol && pos.Magic() == magic_number && pos.Time() >= bar_time)
                 return false;
         }
+        break;
     }
-    break;
 
     case ORDER_MAX_CUSTOM:
+    {
         if (max_order > 0 || max_order_total > 0)
         {
             int symbol_positions = 0;
+            int total_positions = 0;
             for (int i = 0; i < total_positions; i++)
             {
                 if (pos.SelectByIndex(i) && pos.Symbol() == symbol)
                     symbol_positions++;
+                total_positions++;
             }
-            if (symbol_positions >= max_order || total_positions >= max_order_total)
+            if (max_order > 0 && symbol_positions >= max_order)
             {
-                if (debug == ON)
-                    Print("Filter: ", symbol, " sudah mencapai max order (", max_order, ") atau max total (", max_order_total, ")");
+                return false;
+            }
+            if (max_order_total > 0 && total_positions >= max_order_total)
+            {
                 return false;
             }
         }
         break;
-
-    case ORDER_MODE_GRID_PROFIT:
-    case ORDER_MODE_GRID_LOSS:
-        return FilterGridOrder(n);
-        break;
     }
-
-    return true;
-}
-
-/**
- *Memfilter pesanan perdagangan grid berdasarkan kondisi dan parameter yang ditentukan.
- *Memeriksa batas posisi, arah grid, jarak harga, dan batasan jangka waktu.
- *
- *@param n Indeks simbol di simbolArray untuk diperiksa
- *@return true jika posisi grid baru dapat dibuka, false jika tidak
- */
-bool FilterGridOrder(int n)
-{
-    CPositionInfo pos;
-    string symbol = symbolArray[n].symbol;
-
-    int total_positions = PositionsTotal();
-    int grid_positions = 0;
-    double last_position_price = 0;
-    datetime latest_position_time = 0;
-    ENUM_POSITION_TYPE grid_direction = POSITION_TYPE_BUY;
-    double current_price = SymbolInfoDouble(symbol, one_order_type == ORDER_MODE_GRID_PROFIT ? SYMBOL_ASK : SYMBOL_BID);
-
-    // Set arah grid berdasarkan pengaturan
-    switch (grid_direction_setting)
+    case ORDER_MODE_GRID_LOSS:
+    case ORDER_MODE_GRID_PROFIT:
     {
-    case GRID_BUY_ONLY:
-        grid_direction = POSITION_TYPE_BUY;
-        break;
+        double current_price = SymbolInfoDouble(symbol, SYMBOL_ASK);
+        double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+        double min_distance = grid_min * point;
+        double highest_price = 0;
+        double lowest_price = 0;
+        double last_price = 0;
+        datetime latest_time = 0;
+        int t = 0;
 
-    case GRID_SELL_ONLY:
-        grid_direction = POSITION_TYPE_SELL;
-        break;
-
-    case GRID_AUTO_FOLLOW:
-    case GRID_ALL:
-        // Mencari posisi terakhir berdasarkan waktu
+        // Cari harga tertinggi, terendah dan terakhir untuk symbol ini saja
         for (int i = 0; i < total_positions; i++)
         {
-            if (!pos.SelectByIndex(i) || pos.Symbol() != symbol || pos.Magic() != magic_number)
+            if (!pos.SelectByIndex(i))
                 continue;
 
-            if (latest_position_time == 0 || pos.Time() > latest_position_time)
+            // Hanya proses untuk symbol yang sama
+            if (pos.Symbol() != symbol)
+                continue;
+
+            double pos_price = pos.PriceOpen();
+
+            if (latest_time == 0 || pos.Time() > latest_time)
             {
-                latest_position_time = pos.Time();
-                grid_direction = pos.PositionType();
+                last_price = pos_price;
+                latest_time = pos.Time();
+            }
+
+            if (highest_price == 0 || pos_price > highest_price)
+                highest_price = pos_price;
+            if (lowest_price == 0 || pos_price < lowest_price)
+                lowest_price = pos_price;
+
+            t++;
+        }
+
+        // Jika belum ada posisi untuk symbol ini, boleh order
+        if (t == 0)
+            return true;
+
+        // Cek GRID_BUY_ONLY
+        if (grid_direction_setting == GRID_BUY_ONLY)
+        {
+            if (symbolArray[n].finalsignal != 1)
+                return false;
+            if (last_price > 0)
+            {
+                if (one_order_type == ORDER_MODE_GRID_PROFIT)
+                {
+                    if (current_price <= highest_price)
+                        return false;
+                }
+                else // Grid Loss
+                {
+                    if (current_price >= lowest_price)
+                        return false;
+                }
+                if (MathAbs(current_price - last_price) < min_distance)
+                    return false;
             }
         }
-        break;
-    }
 
-    // Loop untuk menghitung posisi grid dan harga terakhir
-    for (int i = 0; i < total_positions; i++)
-    {
-        if (!pos.SelectByIndex(i) || pos.Symbol() != symbol || pos.Magic() != magic_number)
-            continue;
-
-        // Jika mode auto follow, hanya izinkan posisi yang searah dengan posisi terakhir
-        if (grid_direction_setting == GRID_AUTO_FOLLOW && pos.PositionType() != grid_direction)
+        // Cek GRID_SELL_ONLY
+        if (grid_direction_setting == GRID_SELL_ONLY)
         {
-            if (debug == ON)
-                Print("Filter: Arah posisi tidak sesuai dengan auto follow");
-            return false;
-        }
-
-        grid_positions++;
-
-        // Update harga posisi terakhir
-        if (one_order_type == ORDER_MODE_GRID_PROFIT)
-        {
-            if (grid_direction == POSITION_TYPE_BUY)
-                last_position_price = MathMax(last_position_price, pos.PriceOpen());
-            else
-                last_position_price = (last_position_price == 0) ? pos.PriceOpen() : MathMin(last_position_price, pos.PriceOpen());
-        }
-        else // ORDER_MODE_GRID_LOSS
-        {
-            if (grid_direction == POSITION_TYPE_BUY)
-                last_position_price = (last_position_price == 0) ? pos.PriceOpen() : MathMin(last_position_price, pos.PriceOpen());
-            else
-                last_position_price = MathMax(last_position_price, pos.PriceOpen());
-        }
-    }
-
-    // Cek jumlah maksimum grid
-    if (grid_positions >= max_grid)
-    {
-        if (debug == ON)
-            Print("Filter: ", symbol, " sudah mencapai max grid (", max_grid, ")");
-        return false;
-    }
-
-    // Cek jarak dan kondisi harga untuk posisi yang sudah ada
-    if (grid_positions > 0)
-    {
-        double point_distance = MathAbs(current_price - last_position_price) / Point();
-        if (point_distance < grid_min)
-        {
-            if (debug == ON)
-                Print("Filter: ", symbol, " jarak grid belum mencukupi (", point_distance, " < ", grid_min, ")");
-            return false;
-        }
-
-        bool price_condition = (one_order_type == ORDER_MODE_GRID_PROFIT)
-                                   ? (grid_direction == POSITION_TYPE_BUY ? current_price > last_position_price : current_price < last_position_price)
-                                   : (grid_direction == POSITION_TYPE_BUY ? current_price < last_position_price : current_price > last_position_price);
-
-        if (!price_condition)
-        {
-            if (debug == ON)
-                Print("Filter Grid ", (one_order_type == ORDER_MODE_GRID_PROFIT ? "Profit" : "Loss"), " ",
-                      (grid_direction == POSITION_TYPE_BUY ? "BUY" : "SELL"), ": Harga belum memenuhi syarat");
-            return false;
-        }
-    }
-
-    return true;
-}
-
-bool FilterMaxOrder(int n)
-{
-    CPositionInfo pos;
-    string symbol = symbolArray[n].symbol;
-    int total_positions = 0;
-    int total_positions_total = 0;
-    if (max_order > 0 || max_order_total > 0)
-    {
-        for (int i = 0; i < PositionsTotal(); i++)
-        {
-            if (pos.SelectByIndex(i))
+            if (symbolArray[n].finalsignal != -1)
+                return false;
+            if (last_price > 0)
             {
-                if (pos.Symbol() == symbol)
+                if (one_order_type == ORDER_MODE_GRID_PROFIT)
                 {
-                    total_positions++;
+                    if (current_price >= lowest_price)
+                        return false;
+                }
+                else // Grid Loss
+                {
+                    if (current_price <= highest_price)
+                        return false;
+                }
+                if (MathAbs(current_price - last_price) < min_distance)
+                    return false;
+            }
+        }
+
+        // Cek GRID_AUTO_FOLLOW
+        if (grid_direction_setting == GRID_AUTO_FOLLOW)
+        {
+            ENUM_POSITION_TYPE first_position_type = WRONG_VALUE;
+            datetime first_position_time = 0;
+
+            // Cari posisi pertama untuk symbol ini
+            for (int i = 0; i < total_positions; i++)
+            {
+                if (!pos.SelectByIndex(i) || pos.Symbol() != symbol)
+                    continue;
+
+                if (first_position_time == 0 || pos.Time() < first_position_time)
+                {
+                    first_position_time = pos.Time();
+                    first_position_type = pos.PositionType();
+                }
+            }
+
+            if (first_position_time > 0)
+            {
+                if (one_order_type == ORDER_MODE_GRID_PROFIT)
+                {
+                    if (first_position_type == POSITION_TYPE_BUY)
+                    {
+                        if (symbolArray[n].finalsignal != 1)
+                            return false;
+                        if (current_price <= highest_price)
+                            return false;
+                    }
+                    else // SELL
+                    {
+                        if (symbolArray[n].finalsignal != -1)
+                            return false;
+                        if (current_price >= lowest_price)
+                            return false;
+                    }
+                }
+                else // Grid Loss
+                {
+                    if (first_position_type == POSITION_TYPE_BUY)
+                    {
+                        if (symbolArray[n].finalsignal != 1)
+                            return false;
+                        if (current_price >= lowest_price)
+                            return false;
+                    }
+                    else // SELL
+                    {
+                        if (symbolArray[n].finalsignal != -1)
+                            return false;
+                        if (current_price <= highest_price)
+                            return false;
+                    }
+                }
+
+                // Cek jarak minimal
+                if (MathAbs(current_price - last_price) < min_distance)
+                {
+                    if (debug == ON)
+                        Print("Jarak minimal tidak terpenuhi: ", MathAbs(current_price - last_price), " < ", min_distance);
+                    return false;
                 }
             }
         }
 
-        // Jika jumlah posisi sudah mencapai max_order
-        if (total_positions >= max_order)
+        // Cek maksimum grid untuk symbol ini
+        if (t >= max_grid)
         {
             if (debug == ON)
-                Print("Filter: ", symbol, " sudah mencapai max order (", max_order, ")");
+                Print("Grid order: ", symbol, " sudah mencapai max grid (", max_grid, ")");
             return false;
         }
-        if (max_order_total >= PositionsTotal())
-            return false;
+
+        return true;
+    }
     }
     return true;
 }
@@ -1200,23 +1178,3 @@ void TargetOnChart()
 }
 
 string Helper;
-bool cekGridProfitCriteria(ENUM_POSITION_TYPE arah_trading, double harga_sekarang, double harga_posisi_terakhir)
-{
-    if (arah_trading == POSITION_TYPE_BUY && harga_sekarang <= harga_posisi_terakhir)
-    {
-        if (debug == ON)
-        {
-            Print("Filter Grid Profit BUY: Harga belum memenuhi syarat");
-        }
-        return false;
-    }
-    if (arah_trading == POSITION_TYPE_SELL && harga_sekarang >= harga_posisi_terakhir)
-    {
-        if (debug == ON)
-        {
-            Print("Filter Grid Profit SELL: Harga belum memenuhi syarat");
-        }
-        return false;
-    }
-    return true;
-}

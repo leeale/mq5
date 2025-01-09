@@ -4,6 +4,7 @@
 #include <Trade/PositionInfo.mqh>
 #include "Enum.mqh"
 
+#define ORDER_COMMENT komment
 #define MAGIC_NUMBER magic_number
 #define BUTTON_NAME "closeall"
 double m_savedBalance;
