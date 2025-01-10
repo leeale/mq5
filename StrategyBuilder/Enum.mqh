@@ -12,9 +12,16 @@ enum ENUM_DAY_INDO
     Disable
 
 };
+enum ENUM_LOT_MODE
+{
+    GRID_LOT_FIXED,    // Grid Lot Fixed
+    GRID_LOT_MULTIPLY, // Grid Lot Multiply
+    GRID_LOT_ADD,      // Grid Lot Add
+    GRID_DISABLE       // Disable
+};
+
 enum ENUM_GRID_DIRECTION
 {
-    GRID_ALL,        // Buy dan Sell
     GRID_BUY_ONLY,   // Buy Only
     GRID_SELL_ONLY,  // Sell Only
     GRID_AUTO_FOLLOW // Auto Follow First Position
@@ -22,20 +29,17 @@ enum ENUM_GRID_DIRECTION
 
 enum ENUM_ONE_ORDER_TYPE
 {
-    ONE_ORDER_PER_SYMBOL,                         // One Order Per Symbol
-    ONE_ORDER_TOTAL_POSITION,                     // One Order Total Position
-    ONE_ORDER_MAGIC_NUMBER_SYMBOL,                // One Order Magic Number Symbol
-    ONE_ORDER_MAGIC_NUMBER_SYMBOL_TOTAL_POSITION, // One Order Magic Number Total Position
-    ONE_ORDER_PER_TIMEFRAME_SYMBOL_MAGIC_NUMBER,  // One Order Per Timeframe Symbol (Magic Number)
-    ORDER_MAX_CUSTOM,                             // Order Max Custom
-    ORDER_MODE_GRID_PROFIT,                       // Order Mode Grid Profit
-    ORDER_MODE_GRID_LOSS,                         // Order Mode Grid Loss
-    DISABLE                                       // Disable
+    ONE_ORDER_PER_SYMBOL,                        // One Order Per Symbol (Magic Number)
+    ONE_ORDER_TOTAL_POSITION,                    // One Order Total Position (Magic Number)
+    ONE_ORDER_PER_TIMEFRAME_SYMBOL_MAGIC_NUMBER, // One Order Per Timeframe Symbol (Magic Number)
+    ORDER_MAX_CUSTOM,                            // Order Max Custom
+    ORDER_MODE_GRID_PROFIT,                      // Order Mode Grid Profit
+    ORDER_MODE_GRID_LOSS,                        // Order Mode Grid Loss
 };
 enum ENUM_SYMBOL_TYPE
 {
     MULTI_SYMBOL,   // Multi Symbol Market Watch
-    SYMBOL_CURRENT, // Current Symbo
+    SYMBOL_CURRENT, // Current Symbol
     SYMBOL_CUSTOM   // Custom Symbol
 };
 enum ENUM_ON_OFF
@@ -59,9 +63,9 @@ enum ENUM_STRATEGY_COMBINATION
 enum ENUM_SIGNAL_TYPE
 
 {
-    CROSS,   // Cross
-    UP_DOWN, // Up And Down
-    UP_DOWN_REVERSE
+    CROSS,          // Cross
+    UP_DOWN,        // Up And Down
+    UP_DOWN_REVERSE // Up And Down Reverse
 };
 
 enum ENUM_BB_SIGNAL_TYPE

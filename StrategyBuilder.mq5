@@ -20,22 +20,45 @@ symbolInfo symbolArray[];
 // variable Global
 int totalHandles;
 int totalSymbols;
+double lotGrid;
 
 void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
 {
-    if (id == CHARTEVENT_OBJECT_CLICK && sparam == BUTTON_NAME) // Jika tombol diklik
+    if (id == CHARTEVENT_OBJECT_CLICK && sparam == "closeall") // Jika tombol diklik
     {
-        CloseAllOrders();
+        int result = MessageBox("Apakah anda yakin ingin menutup semua order?",
+                                "Konfirmasi Close All",
+                                MB_YESNO | MB_ICONQUESTION);
+
+        if (result == IDYES)
+        {
+            CloseAllOrders();
+        }
+    }
+    if (id == CHARTEVENT_OBJECT_CLICK && sparam == "closeallsymbol") // Jika tombol diklik
+    {
+        int result = MessageBox("Apakah anda yakin ingin menutup semua symbol ini?",
+                                "Konfirmasi Close All",
+                                MB_YESNO | MB_ICONQUESTION);
+
+        if (result == IDYES)
+        {
+            CloseAllOrders(_Symbol);
+        }
     }
 }
 
 int OnInit()
 {
-    m_savedBalance = 0;
-    m_isBalanceLoaded = false;
-    LoadBalance();
-    ShowTargetOnChart();
     CreateCloseButton();
+    CreateCloseButtonSymbol();
+    if (m_targetProfit > 0)
+    {
+        m_savedBalance = 0;
+        m_isBalanceLoaded = false;
+        LoadBalance();
+        ShowTargetOnChart();
+    }
 
     CalcSymbol();
     totalHandles = 11;
@@ -756,7 +779,8 @@ void GetDataSymbol()
 void OpenPosition()
 {
     CTrade trade;
-    trade.SetExpertMagicNumber(MAGIC_NUMBER);
+    CPositionInfo pos;
+    trade.SetExpertMagicNumber(magic_number);
 
     for (int i = 0; i < totalSymbols; i++)
     {
@@ -806,13 +830,28 @@ void OpenPosition()
         }
 
         bool order;
+        double orderlot = lot;
+        bool hasPosition = false;
+        for (int i = 0; i < PositionsTotal(); i++)
+        {
+            if (pos.SelectByIndex(i) && pos.Symbol() == symbol && pos.Magic() == magic_number)
+            {
+                hasPosition = true;
+                break;
+            }
+        }
+        if (hasPosition)
+            orderlot = lotGrid;
+        else
+            orderlot = lot;
+
         if (symbolArray[i].finalsignal == 1)
         {
-            order = trade.Buy(lot, symbol, ask, sl, tp);
+            order = trade.Buy(orderlot, symbol, ask, sl, tp, komment);
             if (order)
             {
                 if (debug == ON)
-                    Print("Order Buy: ", symbol, " Time Lokal: ", TimeLocal(), " Magic Number: ", MAGIC_NUMBER);
+                    Print("Order Buy: ", symbol, " Time Lokal: ", TimeLocal(), " Magic Number: ", magic_number);
             }
             else
             {
@@ -822,11 +861,11 @@ void OpenPosition()
         }
         else
         {
-            order = trade.Sell(lot, symbol, bid, sl, tp);
+            order = trade.Sell(orderlot, symbol, bid, sl, tp, komment);
             if (order)
             {
                 if (debug == ON)
-                    Print("Order Sell: ", symbol, " Time Lokal: ", TimeLocal(), " Magic Number: ", MAGIC_NUMBER);
+                    Print("Order Sell: ", symbol, " Time Lokal: ", TimeLocal(), " Magic Number: ", magic_number);
             }
             else
             {
@@ -839,9 +878,6 @@ void OpenPosition()
 
 bool FilterOrder(int n)
 {
-    // if (one_order_type == ENUM_ONE_ORDER_TYPE::DISABLE)
-    //     return true;
-
     CPositionInfo pos;
     string symbol = symbolArray[n].symbol;
     int total_positions = PositionsTotal();
@@ -855,30 +891,12 @@ bool FilterOrder(int n)
     {
         for (int i = 0; i < total_positions; i++)
         {
-            if (pos.SelectByIndex(i) && pos.Symbol() == symbol)
-                return false;
-        }
-        break;
-    }
-    case ONE_ORDER_TOTAL_POSITION:
-    {
-        for (int i = 0; i < total_positions; i++)
-        {
-            if (pos.SelectByIndex(i))
-                return false;
-        }
-        break;
-    }
-    case ONE_ORDER_MAGIC_NUMBER_SYMBOL:
-    {
-        for (int i = 0; i < total_positions; i++)
-        {
             if (pos.SelectByIndex(i) && pos.Symbol() == symbol && pos.Magic() == magic_number)
                 return false;
         }
         break;
     }
-    case ONE_ORDER_MAGIC_NUMBER_SYMBOL_TOTAL_POSITION:
+    case ONE_ORDER_TOTAL_POSITION:
     {
         for (int i = 0; i < total_positions; i++)
         {
@@ -981,12 +999,16 @@ bool FilterOrder(int n)
                         return false;
                 }
                 if (MathAbs(current_price - last_price) < min_distance)
+                {
+                    if (debug == ON)
+                        Print(MathAbs(current_price - last_price), " < ", min_distance);
                     return false;
+                }
             }
         }
 
         // Cek GRID_SELL_ONLY
-        if (grid_direction_setting == GRID_SELL_ONLY)
+        else if (grid_direction_setting == GRID_SELL_ONLY)
         {
             if (symbolArray[n].finalsignal != -1)
                 return false;
@@ -1008,7 +1030,7 @@ bool FilterOrder(int n)
         }
 
         // Cek GRID_AUTO_FOLLOW
-        if (grid_direction_setting == GRID_AUTO_FOLLOW)
+        else if (grid_direction_setting == GRID_AUTO_FOLLOW)
         {
             ENUM_POSITION_TYPE first_position_type = WRONG_VALUE;
             datetime first_position_time = 0;
@@ -1081,7 +1103,54 @@ bool FilterOrder(int n)
             return false;
         }
 
-        return true;
+        if (mode_grid_timeframe == ON)
+        {
+            datetime bar_time = iTime(symbol, one_order_timeframe, 0);
+            for (int i = 0; i < total_positions; i++)
+            {
+                if (pos.SelectByIndex(i) && pos.Symbol() == symbol && pos.Magic() == magic_number && pos.Time() >= bar_time)
+                    return false;
+            }
+        }
+        // Tambahan kalkulasi lot grid
+        if (grid_lot_mode != GRID_DISABLE)
+        {
+            lotGrid = lot; // Set default ke lot dari input
+            double lastLot = 0;
+            int positionCount = 0;
+
+            if (grid_lot_mode == GRID_LOT_MULTIPLY || grid_lot_mode == GRID_LOT_ADD)
+            {
+                for (int i = 0; i < total_positions; i++)
+                {
+                    if (pos.SelectByIndex(i) &&
+                        pos.Symbol() == symbol &&
+                        pos.Magic() == magic_number)
+                    {
+                        positionCount++;
+                        lastLot = pos.Volume();
+                    }
+                }
+
+                if (lastLot > 0)
+                {
+                    if (grid_lot_mode == GRID_LOT_MULTIPLY)
+                    {
+                        // Menggunakan lot input sebagai dasar
+                        lotGrid = lot * MathPow(martingale_multiplier, positionCount);
+                    }
+                    else if (grid_lot_mode == GRID_LOT_ADD)
+                    {
+                        // Menggunakan lot input sebagai dasar
+                        lotGrid = lot + (grid_add_value * positionCount);
+                    }
+                }
+            }
+            else if (grid_lot_mode == GRID_LOT_FIXED)
+            {
+                lotGrid = fixed_lot;
+            }
+        }
     }
     }
     return true;

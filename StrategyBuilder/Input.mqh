@@ -4,9 +4,8 @@
 #include <Trade/PositionInfo.mqh>
 #include "Enum.mqh"
 
-#define ORDER_COMMENT komment
-#define MAGIC_NUMBER magic_number
 #define BUTTON_NAME "closeall"
+#define BUTTON_NAME1 "closeallsymbol"
 double m_savedBalance;
 bool m_isBalanceLoaded;
 
@@ -14,29 +13,35 @@ input string _ll = "========== ( SETTING GENERAL) =========="; // ​
 input ENUM_ON_OFF debug = OFF;                                 // Debuging
 input ENUM_ON_OFF power = ON;                                  // Power EA
 input ENUM_STRATEGY_COMBINATION combi_signal = AND;            // Signal Combination
-input int m_targetProfit = 10;                                 // Target Profit Close All Order Dollar
+input int m_targetProfit = 10;                                 // Close All Profit, From Last Balanced
+input int m_balancedManual = 0;                                // Set Balanced Awal Harus direset ke 0
 input int InpStopLoss = 0;                                     // Hidden Stop Loss (in points, 0=off)
 input int InpTakeProfit = 0;                                   // Hidden Take Profit (in points, 0=off)
 
-input string _ll2 = "========== ( SETTING SYMBOL) =========="; // ​
-input ENUM_SYMBOL_TYPE multi_symbol = MULTI_SYMBOL;            // Symbol Type
-input string multi_symbol_custom = "EURUSD,GBPUSD,USDJPY";     // Custom Symbol (ex: EURUSD,GBPUSD,USDJPY)
+input string _ll2 = "========== ( SETTING SYMBOL) ==========";          // ​
+input ENUM_SYMBOL_TYPE multi_symbol = ENUM_SYMBOL_TYPE::SYMBOL_CURRENT; // Symbol Type
+input string multi_symbol_custom = "EURUSD,GBPUSD,USDJPY";              // Custom Symbol (ex: EURUSD,GBPUSD,USDJPY)
 
 input string _Lll = "========== ( SETTING OPEN ORDER) =========="; // ​
 input double lot = 0.01;                                           // Lot Size
 input int Stoploss = 100;                                          // Stop Loss (Pointt)
 input int Takeprofit = 0;                                          // Take Profit (Point)
 input int magic_number = 123456;                                   // Magic Number
-input string komment = "";                                         // Comment
+input string komment = "Strategy Builder";                         // Comment
 
 input string _lll = "======= ( SETTING MAX ORDER / LIMIT ORDER) ======="; // ​
 input ENUM_ONE_ORDER_TYPE one_order_type = ONE_ORDER_PER_SYMBOL;          // Mode Order dan Limit Order
-input ENUM_GRID_DIRECTION grid_direction_setting = GRID_ALL;              // Mode Grid Jika Diaktifkan
-input ENUM_TIMEFRAMES one_order_timeframe = PERIOD_D1;                    // Timeframe Mode Order
+input ENUM_GRID_DIRECTION grid_direction_setting = GRID_AUTO_FOLLOW;      // Mode Grid Jika Diaktifkan
+input ENUM_ON_OFF mode_grid_timeframe = OFF;                              // Mode Grid Timeframe
+input ENUM_TIMEFRAMES one_order_timeframe = PERIOD_M1;                    // Timeframe One Order ON, (Jika Mode Grid Perlu Diaktfikan)
 input int max_order = 0;                                                  // Max Order Per Symbol
 input int max_order_total = 0;                                            // Max Order Total
 input int grid_min = 200;                                                 // Grid Min Jarak Order (Profit / Loss Point)
 input int max_grid = 5;                                                   // Position Max Grid
+input ENUM_LOT_MODE grid_lot_mode = GRID_DISABLE;                         // Mode Lot Grid
+input double fixed_lot = 0.01;                                            // Fixed Lot Size
+input double grid_add_value = 0.01;                                       // Grid Add Lot
+input double martingale_multiplier = 2.0;                                 // Multiplier Lot
 
 input string _sdf = "========== ( SETTING FILTER) =========="; // ​
 input int max_spread = 35;                                     // Max Spread (0 = No Max Spread)
@@ -197,7 +202,7 @@ bool IsNewBar(ENUM_TIMEFRAMES timeframe)
     return false;
 }
 
-void CloseAllOrders()
+void CloseAllOrders(string symbol = NULL)
 {
     CPositionInfo position;
     CTrade trade;
@@ -205,10 +210,23 @@ void CloseAllOrders()
     {
         if (position.SelectByIndex(i))
         {
-            if (!trade.PositionClose(position.Ticket()))
-                Print("Error closing position: ", GetLastError());
+            if (symbol == NULL)
+            {
+                if (!trade.PositionClose(position.Ticket()))
+                    Print("Error closing position: ", GetLastError());
+                else
+                    Print("Position closed: ", position.Symbol());
+            }
             else
-                Print("Position closed: ", position.Symbol());
+            {
+                if (position.Symbol() == symbol)
+                {
+                    if (!trade.PositionClose(position.Ticket()))
+                        Print("Error closing position: ", GetLastError());
+                    else
+                        Print("Position closed: ", position.Symbol());
+                }
+            }
         }
     }
 
@@ -224,25 +242,47 @@ void CloseAllOrders()
 }
 void CreateCloseButton()
 {
-    if (ObjectFind(0, BUTTON_NAME) >= 0)
-        ObjectDelete(0, BUTTON_NAME);
+    if (ObjectFind(0, "closeall") >= 0)
+        ObjectDelete(0, "closeall");
 
-    if (!ObjectCreate(0, BUTTON_NAME, OBJ_BUTTON, 0, 0, 0))
+    if (!ObjectCreate(0, "closeall", OBJ_BUTTON, 0, 0, 0))
     {
         Print("Failed to create button: ", GetLastError());
         return;
     }
 
-    ObjectSetInteger(0, BUTTON_NAME, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-    ObjectSetInteger(0, BUTTON_NAME, OBJPROP_XDISTANCE, 20);
-    ObjectSetInteger(0, BUTTON_NAME, OBJPROP_YDISTANCE, 30);
-    ObjectSetInteger(0, BUTTON_NAME, OBJPROP_XSIZE, 100);
-    ObjectSetInteger(0, BUTTON_NAME, OBJPROP_YSIZE, 30);
-    ObjectSetString(0, BUTTON_NAME, OBJPROP_TEXT, "Close All");
-    ObjectSetInteger(0, BUTTON_NAME, OBJPROP_COLOR, clrBlack);
-    ObjectSetInteger(0, BUTTON_NAME, OBJPROP_BORDER_COLOR, clrBlack);
-    ObjectSetInteger(0, BUTTON_NAME, OBJPROP_BGCOLOR, clrWhite);
-    ObjectSetInteger(0, BUTTON_NAME, OBJPROP_SELECTABLE, false);
+    ObjectSetInteger(0, "closeall", OBJPROP_CORNER, CORNER_LEFT_UPPER);
+    ObjectSetInteger(0, "closeall", OBJPROP_XDISTANCE, 20);
+    ObjectSetInteger(0, "closeall", OBJPROP_YDISTANCE, 30);
+    ObjectSetInteger(0, "closeall", OBJPROP_XSIZE, 100);
+    ObjectSetInteger(0, "closeall", OBJPROP_YSIZE, 30);
+    ObjectSetString(0, "closeall", OBJPROP_TEXT, "Close All");
+    ObjectSetInteger(0, "closeall", OBJPROP_COLOR, clrBlack);
+    ObjectSetInteger(0, "closeall", OBJPROP_BORDER_COLOR, clrBlack);
+    ObjectSetInteger(0, "closeall", OBJPROP_BGCOLOR, clrWhite);
+    ObjectSetInteger(0, "closeall", OBJPROP_SELECTABLE, false);
+}
+void CreateCloseButtonSymbol()
+{
+    if (ObjectFind(0, "closeallsymbol") >= 0)
+        ObjectDelete(0, "closeallsymbol");
+
+    if (!ObjectCreate(0, "closeallsymbol", OBJ_BUTTON, 0, 0, 0))
+    {
+        Print("Failed to create button: ", GetLastError());
+        return;
+    }
+
+    ObjectSetInteger(0, "closeallsymbol", OBJPROP_CORNER, CORNER_LEFT_UPPER);
+    ObjectSetInteger(0, "closeallsymbol", OBJPROP_XDISTANCE, 130);
+    ObjectSetInteger(0, "closeallsymbol", OBJPROP_YDISTANCE, 30);
+    ObjectSetInteger(0, "closeallsymbol", OBJPROP_XSIZE, 130);
+    ObjectSetInteger(0, "closeallsymbol", OBJPROP_YSIZE, 30);
+    ObjectSetString(0, "closeallsymbol", OBJPROP_TEXT, "Close All Symbol");
+    ObjectSetInteger(0, "closeallsymbol", OBJPROP_COLOR, clrWhite);
+    ObjectSetInteger(0, "closeallsymbol", OBJPROP_BORDER_COLOR, clrBlack);
+    ObjectSetInteger(0, "closeallsymbol", OBJPROP_BGCOLOR, clrRed);
+    ObjectSetInteger(0, "closeallsymbol", OBJPROP_SELECTABLE, false);
 }
 
 void ShowTargetOnChart()
@@ -306,20 +346,36 @@ double LoadBalance()
     if (!m_isBalanceLoaded)
     {
         string filename = "balance_history.txt";
-        if (FileIsExist(filename))
+        if (m_balancedManual > 0)
         {
-            int handle = FileOpen(filename, FILE_READ | FILE_TXT | FILE_ANSI);
-            string content = FileReadString(handle);
-            m_savedBalance = StringToDouble(content);
-            FileClose(handle);
+            // Jika balance diset manual, gunakan nilai tersebut
+            m_savedBalance = m_balancedManual;
+
+            m_savedBalance = m_balancedManual;
+            int handle = FileOpen(filename, FILE_WRITE | FILE_TXT | FILE_ANSI);
+            if (handle != INVALID_HANDLE)
+            {
+                FileWriteString(handle, DoubleToString(m_balancedManual, 2));
+                FileClose(handle);
+            }
         }
         else
         {
-            double currentBalance = AccountInfoDouble(ACCOUNT_BALANCE);
-            int handle = FileOpen(filename, FILE_WRITE | FILE_TXT | FILE_ANSI);
-            FileWriteString(handle, DoubleToString(currentBalance, 2));
-            FileClose(handle);
-            m_savedBalance = currentBalance;
+            if (FileIsExist(filename))
+            {
+                int handle = FileOpen(filename, FILE_READ | FILE_TXT | FILE_ANSI);
+                string content = FileReadString(handle);
+                m_savedBalance = StringToDouble(content);
+                FileClose(handle);
+            }
+            else
+            {
+                double currentBalance = AccountInfoDouble(ACCOUNT_BALANCE);
+                int handle = FileOpen(filename, FILE_WRITE | FILE_TXT | FILE_ANSI);
+                FileWriteString(handle, DoubleToString(currentBalance, 2));
+                FileClose(handle);
+                m_savedBalance = currentBalance;
+            }
         }
         m_isBalanceLoaded = true;
     }
@@ -328,8 +384,12 @@ double LoadBalance()
 
 void DeleteButtonAndLabels()
 {
-    ObjectDelete(0, "TargetLabel1");
-    ObjectDelete(0, "TargetLabel2");
-    ObjectDelete(0, BUTTON_NAME);
+    if (m_targetProfit > 0)
+    {
+        ObjectDelete(0, "TargetLabel1");
+        ObjectDelete(0, "TargetLabel2");
+    }
+    ObjectDelete(0, "closeall");
+    ObjectDelete(0, "closeallsymbol");
     ChartRedraw(0);
 }
