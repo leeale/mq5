@@ -12,11 +12,26 @@ enum ENUM_DAY_INDO
     Disable
 
 };
+enum ENUM_TRADING_DIRECTION
+{
+    BUY,  // Buy
+    SELL, // Sell
+    ALL   // Buy and Sell
+};
+
+enum ENUM_LOT_TYPE
+{
+    LOT_FIXED,   // Lot Fixed
+    LOT_BALANCE, // Lot Balance Accumulation
+    LOT_EQUITY,  // Lot Equity Accumulation
+    LOT_RISK     // Lot Risk Percent
+};
 enum ENUM_LOT_MODE
 {
     GRID_LOT_FIXED,    // Grid Lot Fixed
     GRID_LOT_MULTIPLY, // Grid Lot Multiply
     GRID_LOT_ADD,      // Grid Lot Add
+    GRID_LOT_CUSTOM,   // Grid Lot Custom
     GRID_DISABLE       // Disable
 };
 
@@ -35,6 +50,7 @@ enum ENUM_ONE_ORDER_TYPE
     ORDER_MAX_CUSTOM,                            // Order Max Custom
     ORDER_MODE_GRID_PROFIT,                      // Order Mode Grid Profit
     ORDER_MODE_GRID_LOSS,                        // Order Mode Grid Loss
+
 };
 enum ENUM_SYMBOL_TYPE
 {

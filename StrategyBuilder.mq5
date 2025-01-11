@@ -50,6 +50,8 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
 
 int OnInit()
 {
+    // DeleteAllChartsAndObjects();
+
     CreateCloseButton();
     CreateCloseButtonSymbol();
     if (m_targetProfit > 0)
@@ -91,6 +93,7 @@ int OnInit()
 }
 void OnTick()
 {
+
     TargetOnChart();
 }
 void OnTimer()
@@ -131,7 +134,7 @@ void OnDeinit(const int reason)
             }
         }
     }
-    DeleteButtonAndLabels();
+    ObjectsDeleteAll(0);
     EventKillTimer();
 }
 
@@ -784,9 +787,6 @@ void OpenPosition()
 
     for (int i = 0; i < totalSymbols; i++)
     {
-        if (symbolArray[i].finalsignal == 0)
-            continue;
-
         if (!FilterOrder(i))
             continue;
 
@@ -829,8 +829,9 @@ void OpenPosition()
                 tp = bid - (Takeprofit * point);
         }
 
+        double orderlot = CalculateLotSize(symbol);
+        Print(orderlot);
         bool order;
-        double orderlot = lot;
         bool hasPosition = false;
         for (int i = 0; i < PositionsTotal(); i++)
         {
@@ -842,8 +843,6 @@ void OpenPosition()
         }
         if (hasPosition)
             orderlot = lotGrid;
-        else
-            orderlot = lot;
 
         if (symbolArray[i].finalsignal == 1)
         {
@@ -878,12 +877,27 @@ void OpenPosition()
 
 bool FilterOrder(int n)
 {
+    if (symbolArray[n].finalsignal == 0)
+        return false;
     CPositionInfo pos;
     string symbol = symbolArray[n].symbol;
     int total_positions = PositionsTotal();
 
     if (total_positions == 0) // Kondisi 1: belum ada order sama sekali
         return true;
+
+    if (trading_direction != ALL)
+    {
+        switch (trading_direction)
+        {
+        case BUY:
+            if (symbolArray[n].finalsignal != 1)
+                return false;
+        case SELL:
+            if (symbolArray[n].finalsignal != -1)
+                return false;
+        }
+    }
 
     switch (one_order_type)
     {
@@ -908,10 +922,25 @@ bool FilterOrder(int n)
     case ONE_ORDER_PER_TIMEFRAME_SYMBOL_MAGIC_NUMBER:
     {
         datetime bar_time = iTime(symbol, one_order_timeframe, 0);
+        double current_price = SymbolInfoDouble(symbol, SYMBOL_BID);
+
         for (int i = 0; i < total_positions; i++)
         {
-            if (pos.SelectByIndex(i) && pos.Symbol() == symbol && pos.Magic() == magic_number && pos.Time() >= bar_time)
-                return false;
+            if (pos.SelectByIndex(i) && pos.Symbol() == symbol && pos.Magic() == magic_number)
+            {
+                // Cek waktu
+                if (pos.Time() >= bar_time)
+                    return false;
+
+                // Cek jarak minimal
+                if (min_distance_points > 0)
+                {
+                    double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+                    double distance = MathAbs(current_price - pos.PriceOpen()) / point;
+                    if (distance < min_distance_points)
+                        return false;
+                }
+            }
         }
         break;
     }
@@ -922,23 +951,52 @@ bool FilterOrder(int n)
         {
             int symbol_positions = 0;
             int total_positions = 0;
-            for (int i = 0; i < total_positions; i++)
+            double current_price = SymbolInfoDouble(symbol, SYMBOL_BID);
+
+            // Gunakan PositionsTotal() untuk loop
+            for (int i = 0; i < PositionsTotal(); i++)
             {
-                if (pos.SelectByIndex(i) && pos.Symbol() == symbol)
-                    symbol_positions++;
+                if (!pos.SelectByIndex(i) || pos.Magic() != magic_number)
+                    continue;
+
+                // Hitung total posisi dengan magic number yang sama
                 total_positions++;
+
+                // Cek symbol yang sama
+                if (pos.Symbol() == symbol)
+                {
+                    symbol_positions++;
+
+                    // Cek jarak minimal
+                    if (min_distance_points > 0)
+                    {
+                        double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+                        double distance = MathAbs(current_price - pos.PriceOpen()) / point;
+                        if (distance < min_distance_points)
+                        {
+                            Print("Distance too close: ", distance, " points");
+                            return false;
+                        }
+                    }
+                }
             }
+
+            // Cek max order per symbol
             if (max_order > 0 && symbol_positions >= max_order)
             {
+                Print("Max orders per symbol reached: ", symbol_positions, "/", max_order);
                 return false;
             }
+
+            // Cek total max order
             if (max_order_total > 0 && total_positions >= max_order_total)
             {
+                Print("Max total orders reached: ", total_positions, "/", max_order_total);
                 return false;
             }
         }
-        break;
     }
+    break;
     case ORDER_MODE_GRID_LOSS:
     case ORDER_MODE_GRID_PROFIT:
     {
@@ -958,7 +1016,7 @@ bool FilterOrder(int n)
                 continue;
 
             // Hanya proses untuk symbol yang sama
-            if (pos.Symbol() != symbol)
+            if (pos.Symbol() != symbol || pos.Magic() != magic_number)
                 continue;
 
             double pos_price = pos.PriceOpen();
@@ -1119,7 +1177,7 @@ bool FilterOrder(int n)
             double lastLot = 0;
             int positionCount = 0;
 
-            if (grid_lot_mode == GRID_LOT_MULTIPLY || grid_lot_mode == GRID_LOT_ADD)
+            if (grid_lot_mode == GRID_LOT_MULTIPLY || grid_lot_mode == GRID_LOT_ADD || grid_lot_mode == GRID_LOT_CUSTOM)
             {
                 for (int i = 0; i < total_positions; i++)
                 {
@@ -1144,6 +1202,31 @@ bool FilterOrder(int n)
                         // Menggunakan lot input sebagai dasar
                         lotGrid = lot + (grid_add_value * positionCount);
                     }
+                    else if (grid_lot_mode == GRID_LOT_CUSTOM)
+                    {
+                        string lots[];
+                        int total_lots = StringSplit(grid_lot_custom, ',', lots);
+
+                        // Konversi string ke array double
+                        double custom_lots[];
+                        ArrayResize(custom_lots, total_lots);
+
+                        for (int i = 0; i < total_lots; i++)
+                        {
+                            custom_lots[i] = StringToDouble(lots[i]);
+                        }
+
+                        // Gunakan lot sesuai urutan grid
+                        if (positionCount < total_lots)
+                        {
+                            lotGrid = custom_lots[positionCount];
+                        }
+                        else
+                        {
+                            // Jika melebihi jumlah lot yang didefinisikan, gunakan lot terakhir
+                            lotGrid = custom_lots[total_lots - 1];
+                        }
+                    }
                 }
             }
             else if (grid_lot_mode == GRID_LOT_FIXED)
@@ -1151,7 +1234,12 @@ bool FilterOrder(int n)
                 lotGrid = fixed_lot;
             }
         }
-    }
+
+        if (grid_max_lot > 0 && lotGrid > grid_max_lot)
+            lotGrid = grid_max_lot;
+
+        break;
+        }
     }
     return true;
 }
@@ -1244,6 +1332,59 @@ void TargetOnChart()
             CheckAndCloseAllOrders();
         }
     }
+}
+
+double CalculateLotSize(string symbol)
+{
+    double calculated_lot = lot;
+
+    switch (lot_type)
+    {
+    case LOT_FIXED:
+    {
+        calculated_lot = lot;
+    }
+    break;
+
+    case LOT_BALANCE:
+    {
+        double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+        calculated_lot = NormalizeDouble((balance / lot_balance) * lot, 2);
+    }
+    break;
+    case LOT_EQUITY:
+    {
+        double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+        calculated_lot = NormalizeDouble((equity / lot_balance) * lot, 2);
+    }
+    break;
+
+    case LOT_RISK:
+    {
+        if (Stoploss <= 0)
+            return 0.01;
+
+        double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+        double risk_amount = balance * (risk_percent / 100);
+        double tick_value = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
+        double total_loss = Stoploss * tick_value;
+        calculated_lot = NormalizeDouble(risk_amount / total_loss, 2);
+    }
+    break;
+    }
+
+    // Validasi lot size
+    if (max_lot > 0 && calculated_lot > max_lot)
+    {
+        Print("Warning: Calculated lot ", calculated_lot, " exceeds max lot ", max_lot);
+        calculated_lot = max_lot;
+    }
+
+    if (calculated_lot < 0.01)
+        calculated_lot = 0.01;
+
+    Print("Final Lot Size: ", calculated_lot);
+    return calculated_lot;
 }
 
 string Helper;
