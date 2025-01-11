@@ -2,7 +2,10 @@
 #property copyright "Copyright 2024, Ali Usman"
 #property version "1.00"
 #property strict
+#property script_show_inputs
+
 #include "StrategyBuilder/Input.mqh"
+#include "StrategyBuilder/Fungsi.mqh"
 
 struct symbolInfo
 {
@@ -50,7 +53,6 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
 
 int OnInit()
 {
-    // DeleteAllChartsAndObjects();
 
     CreateCloseButton();
     CreateCloseButtonSymbol();
@@ -93,8 +95,8 @@ int OnInit()
 }
 void OnTick()
 {
-
     TargetOnChart();
+    FiturTambahan();
 }
 void OnTimer()
 {
@@ -781,8 +783,7 @@ void GetDataSymbol()
 
 void OpenPosition()
 {
-    CTrade trade;
-    CPositionInfo pos;
+
     trade.SetExpertMagicNumber(magic_number);
 
     for (int i = 0; i < totalSymbols; i++)
@@ -879,7 +880,6 @@ bool FilterOrder(int n)
 {
     if (symbolArray[n].finalsignal == 0)
         return false;
-    CPositionInfo pos;
     string symbol = symbolArray[n].symbol;
     int total_positions = PositionsTotal();
 
@@ -1239,7 +1239,7 @@ bool FilterOrder(int n)
             lotGrid = grid_max_lot;
 
         break;
-        }
+    }
     }
     return true;
 }
@@ -1249,10 +1249,7 @@ void HiddenTP_SL()
     if (InpStopLoss == 0 && InpTakeProfit == 0)
         return;
 
-    CTrade trade;
     trade.SetExpertMagicNumber(magic_number);
-    CPositionInfo pos;
-
     for (int i = 0; i < PositionsTotal(); i++)
     {
         if (!pos.SelectByIndex(i))
@@ -1387,4 +1384,20 @@ double CalculateLotSize(string symbol)
     return calculated_lot;
 }
 
-string Helper;
+struct Helper
+{
+};
+void FiturTambahan()
+{
+    if (IsNewBar(PERIOD_M5))
+    {
+        if (iBreakEven == ON)
+        {
+            for (int i = 0; i < totalSymbols; i++)
+            {
+                string symbol = symbolArray[i].symbol;
+                SetBreakEven(symbol, iBreakeven_dollar, iBreakeven_point);
+            }
+        }
+    }
+}

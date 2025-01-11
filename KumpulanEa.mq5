@@ -1,13 +1,13 @@
-#include <Trade\Trade.mqh>         // Library untuk operasi trading
-#include <Trade\PositionInfo.mqh>  // Library untuk mengelola posisi
+#include <Trade/Trade.mqh>        // Library untuk operasi trading
+#include <Trade/PositionInfo.mqh> // Library untuk mengelola posisi
 
-CTrade trade;       // Objek untuk operasi trading
-CPositionInfo pos;  // Objek untuk mendapatkan informasi posisi
+CTrade trade;      // Objek untuk operasi trading
+CPositionInfo pos; // Objek untuk mendapatkan informasi posisi
 
 // Input parameter
 input double ProfitTrigger = 10.0;    // Profit trigger dalam mata uang akun
-input double BufferPips = 2.0;       // Buffer untuk Break-Even (pip)
-input double MinimalStopLoss = 5.0;  // Minimal Stop Loss jika modifikasi gagal (pip)
+input double BufferPips = 2.0;        // Buffer untuk Break-Even (pip)
+input double MinimalStopLoss = 5.0;   // Minimal Stop Loss jika modifikasi gagal (pip)
 input string TargetSymbol = "EURUSD"; // Simbol target
 
 // Fungsi untuk mengatur Break-Even dengan fallback Stop Loss
@@ -59,7 +59,7 @@ void SetBreakEven(string symbol, double profitTrigger, double buffer, double min
             else
             {
                Print("Gagal memodifikasi Stop Loss untuk posisi ", ticket, ". Mencoba set Stop Loss minimal.");
-               
+
                // Coba atur Stop Loss minimal jika modifikasi gagal
                if (positionType == POSITION_TYPE_BUY)
                {
@@ -90,7 +90,7 @@ int OnInit()
    // Set timer untuk memeriksa posisi secara periodik
    EventSetTimer(60); // Timer setiap 60 detik
    Print("EA diinisialisasi. Timer diaktifkan.");
-   return(INIT_SUCCEEDED);
+   return (INIT_SUCCEEDED);
 }
 
 // Event handler OnTimer
