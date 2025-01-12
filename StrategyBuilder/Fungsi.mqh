@@ -11,6 +11,90 @@ bool m_isBalanceLoaded;
 CPositionInfo pos;
 CTrade trade;
 
+int GetSignalBase(string symbol, BaseSymbol baseSymbol)
+{
+    string baseStr = GetBaseSymbolString(baseSymbol);
+    bool isBaseFirst = (StringSubstr(symbol, 0, 3) == baseStr);
+    bool isBaseSecond = (StringSubstr(symbol, 3, 3) == baseStr);
+
+    // Jika simbol tidak mengandung base currency yang dicari
+    if (!isBaseFirst && !isBaseSecond)
+        return 0;
+    if (base_direction == ENUM_BASE_DIRECTION::BUY)
+    {
+        if (isBaseFirst)
+            return 1; // Buy BASE/XXX
+        else
+            return -1; // Sell XXX/BASE
+    }
+    else if (base_direction == ENUM_BASE_DIRECTION::SELL)
+    {
+        if (isBaseFirst)
+            return -1; // Sell BASE/XXX
+        else
+            return 1; // Buy XXX/BASE
+    }
+    else if (base_direction == ENUM_BASE_DIRECTION::ALL_BUY)
+        return 1; // Buy
+    else if (base_direction == ENUM_BASE_DIRECTION::ALL_SELL)
+        return -1; // Sell
+
+    return 0;
+}
+void SetTargetBalance()
+{
+    if (m_targetProfit > 0)
+    {
+        m_savedBalance = 0;
+        m_isBalanceLoaded = false;
+        LoadBalance();
+        ShowTargetOnChart();
+    }
+}
+bool IsCorrelatedSymbol(string pair, BaseSymbol baseSymbol)
+{
+    // Daftar pasangan dengan korelasi positif untuk setiap simbol dasar
+    switch (baseSymbol)
+    {
+    case USD:
+        return (StringFind(pair, "USD") >= 0); // Semua pasangan yang mengandung USD
+    case GBP:
+        return (StringFind(pair, "GBP") >= 0); // Semua pasangan yang mengandung GBP
+    case EUR:
+        return (StringFind(pair, "EUR") >= 0); // Semua pasangan yang mengandung EUR
+    case JPY:
+        return (StringFind(pair, "JPY") >= 0); // Semua pasangan yang mengandung JPY
+    case CAD:
+        return (StringFind(pair, "CAD") >= 0); // Semua pasangan yang mengandung CAD
+    case CHF:
+        return (StringFind(pair, "CHF") >= 0); // Semua pasangan yang mengandung CHF
+    case AUD:
+        return (StringFind(pair, "AUD") >= 0); // Semua pasangan yang mengandung AUD
+    }
+    return false; // Default: tidak ada pasangan yang cocok
+}
+
+string GetBaseSymbolString(BaseSymbol baseSymbol)
+{
+    switch (baseSymbol)
+    {
+    case USD:
+        return "USD";
+    case GBP:
+        return "GBP";
+    case EUR:
+        return "EUR";
+    case JPY:
+        return "JPY";
+    case CAD:
+        return "CAD";
+    case CHF:
+        return "CHF";
+    case AUD:
+        return "AUD";
+    }
+    return ""; // Default: return empty string jika tidak ada yang cocok
+}
 void SetBreakEven(string symbol, double profitTrigger = 1.0, double buffer = 30)
 {
     double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
@@ -86,9 +170,6 @@ void SetBreakEven(string symbol, double profitTrigger = 1.0, double buffer = 30)
         }
     }
 }
-
-//=============== FUNGSI PEMBANTU === ==============
-
 bool IsPositionBySymbol(string symbol)
 {
     bool hasPosition = false;
@@ -116,7 +197,6 @@ bool IsNewBar(ENUM_TIMEFRAMES timeframe)
     }
     return false;
 }
-
 void CloseAllOrders(string symbol = NULL)
 {
 
@@ -154,7 +234,6 @@ void CloseAllOrders(string symbol = NULL)
         }
     }
 }
-
 void CreateCloseButton()
 {
     if (ObjectFind(0, "closeall") >= 0)
@@ -199,7 +278,6 @@ void CreateCloseButtonSymbol()
     ObjectSetInteger(0, "closeallsymbol", OBJPROP_BGCOLOR, clrRed);
     ObjectSetInteger(0, "closeallsymbol", OBJPROP_SELECTABLE, false);
 }
-
 void ShowTargetOnChart()
 {
     double currentEquity = AccountInfoDouble(ACCOUNT_EQUITY);
@@ -230,7 +308,6 @@ void ShowTargetOnChart()
 
     ChartRedraw(0);
 }
-
 void CheckAndCloseAllOrders()
 {
     double currentEquity = AccountInfoDouble(ACCOUNT_EQUITY);

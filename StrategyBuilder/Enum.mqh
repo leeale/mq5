@@ -1,5 +1,52 @@
 
-// ================== ENUM GENERAL ==================
+enum ENUM_MODE_SIGNAL
+{
+    MODE_SIGNAL_MANUAL, // Mode Signal Manual
+    MODE_SIGNAL_AUTO,   // Mode Signal Auto
+    MODE_SIGNAL_MULTI,  // Mode Multi Indikator
+    DISABLE,            // Disable
+};
+
+enum ENUM_SIGNAL_MANUAL_TYPE
+{
+    UP_DOWN,         // Up And Down
+    UP_DOWN_REVERSE, // Up And Down Reverse
+    CROSS,           // Cross
+    CROSS_REVERSE    // Cross Reverse
+
+};
+
+enum ENUM_INDICATOR_TYPE
+{
+    IND_BOLLINGER_BANDS, // Bollinger Bands
+    IND_MOVING_AVERAGE,  // Moving Average
+    IND_RSI,             // Relative Strength Index
+    IND_MACD,            // MACD
+    IND_STOCHASTIC,      // Stochastic
+    IND_ATR,             // ATR
+    IND_ADX,             // ADX
+    IND_CCI              // CCI
+};
+
+enum ENUM_SIGNAL_AUTO
+{
+    SIGNAL_1,  // Reversal BB + RSI
+    SIGNAL_2,  // MA Cross + RSI
+    SIGNAL_3,  // BB + MACD + RSI
+    SIGNAL_4,  // MA + Stochastic
+    SIGNAL_5,  // BB Squeeze + Momentum
+    SIGNAL_6,  // Triple MA Cross
+    SIGNAL_7,  // RSI + Stochastic + MACD
+    SIGNAL_8,  // Ichimoku Cloud + RSI
+    SIGNAL_9,  // MA + ADX + CCI
+    SIGNAL_10, // BB + SuperTrend
+    SIGNAL_11, // Pivot + RSI + Volume
+    SIGNAL_12, // ZigZag + MA
+    SIGNAL_13, // Pattern + Volume
+    SIGNAL_14, // MA + ATR + RSI
+    SIGNAL_15  // Custom Combination
+};
+
 enum ENUM_DAY_INDO
 {
     Minggu,
@@ -12,11 +59,29 @@ enum ENUM_DAY_INDO
     Disable
 
 };
+enum BaseSymbol
+{
+    USD, // USD
+    GBP, // GBP
+    EUR, // EUR
+    JPY, // JPY
+    CAD, // CAD
+    CHF, // CHF
+    AUD  // AUD
+};
+
 enum ENUM_TRADING_DIRECTION
 {
     BUY,  // Buy
     SELL, // Sell
     ALL   // Buy and Sell
+};
+enum ENUM_BASE_DIRECTION
+{
+    BUY,     // Buy Base
+    SELL,    // Sell Base
+    ALL_BUY, // All Buy (ex: xxxUSD Or USDxxx = Buy)
+    ALL_SELL // All Sell (ex: xxxGBP Or GBPxxx = Sell)
 };
 
 enum ENUM_LOT_TYPE
@@ -56,7 +121,11 @@ enum ENUM_SYMBOL_TYPE
 {
     MULTI_SYMBOL,   // Multi Symbol Market Watch
     SYMBOL_CURRENT, // Current Symbol
-    SYMBOL_CUSTOM   // Custom Symbol
+    SYMBOL_BASE,    // Mode Base Symbol
+    SYMBOL_CUSTOM,  // Custom Symbol 1
+    SYMBOL_CUSTOM1, // Custom Symbol 2
+    SYMBOL_CUSTOM2, // Custom Symbol 3
+    SYMBOL_CUSTOM3  // Custom Symbol 4
 };
 enum ENUM_ON_OFF
 {

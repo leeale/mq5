@@ -11,9 +11,14 @@ input int m_balancedManual = 0;                                // Set Balanced M
 input int InpStopLoss = 0;                                     // Hidden Stop Loss (in points, 0=off)
 input int InpTakeProfit = 0;                                   // Hidden Take Profit (in points, 0=off)
 
-input string _ll2 = "========== ( SETTING SYMBOL) ==========";          // ​
-input ENUM_SYMBOL_TYPE multi_symbol = ENUM_SYMBOL_TYPE::SYMBOL_CURRENT; // Symbol Type
-input string multi_symbol_custom = "EURUSD,GBPUSD,USDJPY";              // Custom Symbol (ex: EURUSD,GBPUSD,USDJPY)
+input string _ll2 = "========== ( SETTING SYMBOL) ==========";                          // ​
+input ENUM_SYMBOL_TYPE multi_symbol = ENUM_SYMBOL_TYPE::SYMBOL_CURRENT;                 // Symbol Type
+input BaseSymbol TradingBaseOnSymbol = USD;                                             // Mode Base Symbol
+input ENUM_BASE_DIRECTION base_direction = ENUM_BASE_DIRECTION::BUY;                    // Base Direction (ex Buy, USDXXX Buy, XXXUSD Sell)
+input string multi_symbol_custom = "GBPUSD,GBPJPY,GBPCHF,GBPAUD,GBPNZD,GBPCAD,EURGBP";  // Custom Symbol 1
+input string multi_symbol_custom1 = "EURUSD,EURJPY,EURCHF,EURAUD,EURNZD,EURCAD,EURGBP"; // Custom Symbol 2
+input string multi_symbol_custom2 = "USDJPY,USDCAD,USDCHF,EURUSD,GBPUSD,AUDUS,NZDUSD";  // Custom Symbol 2
+input string multi_symbol_custom3 = "USDJPY,EURJPY,GBPJPY,AUDJPY,NZJPY,CADJPY,CHFJPY";  // Custom Symbol 3
 
 input string _Lll = "========== ( SETTING OPEN ORDER) ==========";            // ​
 input ENUM_TRADING_DIRECTION trading_direction = ENUM_TRADING_DIRECTION::ALL; // Mode Order
@@ -44,17 +49,27 @@ input double martingale_multiplier = 2.0;                               // Grid 
 input double grid_max_lot = 0.1;                                        // Grid Max Lot
 input string grid_lot_custom = "0,01,0.02,0.03";                        // Grid Lot Custom (ex: 0,01,0.02,0.03)
 input string _sdf = "========== ( SETTING FILTER) ==========";          // ​
+input ENUM_ON_OFF setting_filter = ON;                                  // On Off Filter validasi
 input int max_spread = 35;                                              // Max Spread (0 = No Max Spread)
 input int jam_start = 2;                                                // Jam Start (0 = No Jam Start)
 input int jam_end = 22;                                                 // Jam End (0 = No Jam End)
 input ENUM_DAY_INDO no_day_trading1 = Disable;                          // No Day Trading 1
 input ENUM_DAY_INDO no_day_trading2 = Disable;                          // No Day Trading 2
 sinput string _sdfd = "========== ( FITUR TAMBAHAN) ==========";        // ​
-input ENUM_ON_OFF iBreakEven = OFF;                                     // Break Even
-input double iBreakeven_dollar = 0;                                     // Break Even Dollar
-input double iBreakeven_point = 0;                                      // Break Even Poin
+// input ENUM_ON_OFF iBreakEven = OFF;                                     // Break Even
+input double iBreakeven_dollar = 0; // Break Even Dollar
+input double iBreakeven_point = 0;  // Break Even Poin
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+input string _ll3 = "========== ( SETTING SIGNAL) ==========";                       // ​
+input ENUM_MODE_SIGNAL signal_mode = ENUM_MODE_SIGNAL::DISABLE;                      // Mode Signal
+input ENUM_SIGNAL_AUTO signal_auto = ENUM_SIGNAL_AUTO::SIGNAL_1;                     // Signal Auto
+input ENUM_INDICATOR_TYPE signal_manual = ENUM_INDICATOR_TYPE::IND_MOVING_AVERAGE;   // Signal Manual
+input ENUM_SIGNAL_MANUAL_TYPE signal_manual_type = ENUM_SIGNAL_MANUAL_TYPE::UP_DOWN; // Signal Manual Type
+input int siganl_manual_total = 3;                                                   // Signal Manual Total
+input string signal_manual_period = "10,20,30";                                      // Signal Manual Period
+input string signal_manual_timeframe = "M1,M5,M15";                                  // Signal Manual Timeframe
+
 input string ma1 = "========== (MA) 1# indikator MA =========="; // ​
 input ENUM_ON_OFF ma1_active = OFF;                              // On Off Moving Averaging
 input ENUM_SIGNAL_TYPE ma1_type = ENUM_SIGNAL_TYPE::UP_DOWN;     // Signal Type
