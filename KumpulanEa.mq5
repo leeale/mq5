@@ -81,4 +81,18 @@ void OnStart() {
     Print("Mulai: ", p.mulai, ", Nomor Bar: ", p.nomorBar);
 }
 
+struct Pengaturan {
+    datetime mulai;
+    int nomorBar;
+};
 
+void CetakPengaturan(Pengaturan p) {
+    Print("Mulai: ", p.mulai, ", Nomor Bar: ", p.nomorBar);
+}
+
+void OnStart() {
+    Pengaturan p;
+    p.mulai = D'2021.01.01';
+    p.nomorBar = 1000;
+    CetakPengaturan(p); // Memanggil fungsi dengan struktur
+}
