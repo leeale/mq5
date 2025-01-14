@@ -87,7 +87,8 @@ void OnTimer()
     MainGetSetSignal();
     MainSignal();
     MainOrder();
-    IncGetDataSymbol();
+    if (isDebug)
+        IncGetDataSymbol();
 }
 
 void OnDeinit(const int reason)
@@ -170,7 +171,7 @@ ENUM_FILTER_RESULT IncMainFilterGeneral(string &message)
 void InitSymbol()
 {
 
-    ArrayFree(symbolArray);
+    //  ArrayFree(symbolArray);
 
     string symboldata[];
     if (multi_symbol == ENUM_SYMBOL_TYPE::MULTI_SYMBOL)
@@ -244,8 +245,8 @@ void InitSymbol()
     {
         for (int i = 0; i < totalSymbols; i++)
         {
-            // Reset signalBase ke 0 untuk tipe symbol lainnya
-            symbolArray[i].signalBase = 0; // Tambahkan ini
+            // // Reset signalBase ke 0 untuk tipe symbol lainnya
+            // symbolArray[i].signalBase = 0; // Tambahkan ini
             if (multi_symbol == ENUM_SYMBOL_TYPE::MULTI_SYMBOL)
                 symbolArray[i].symbol = SymbolName(i, true);
             else if (multi_symbol == ENUM_SYMBOL_TYPE::SYMBOL_CUSTOM)
@@ -280,15 +281,15 @@ void InitHandle()
         for (int j = 0; j < totalHandles; j++)
         {
             // Inisialisasi
-            symbolArray[i].signal[j] = 0;
-            symbolArray[i].isActive[j] = false;
-            symbolArray[i].isBuy[j] = false;
-            symbolArray[i].isSell[j] = false;
-            symbolArray[i].timeframe[j] = 0;
-            symbolArray[i].signal_type[j] = 0;
-
             if (signal_mode == MODE_SIGNAL_MULTI)
             {
+                symbolArray[i].signal[j] = 0;
+                symbolArray[i].isActive[j] = false;
+                symbolArray[i].isBuy[j] = false;
+                symbolArray[i].isSell[j] = false;
+                symbolArray[i].timeframe[j] = 0;
+                symbolArray[i].signal_type[j] = 0;
+
                 if (j <= 5)
                     IncHandleMa(i, j);
                 else
@@ -340,6 +341,18 @@ void InitHandle()
 
 void MainGetSetSignal()
 {
+    // reset all signal
+    for (int s = 0; s < totalSymbols; s++)
+    {
+        symbolArray[s].finalsignal = 0;
+        for (int h = 0; h < totalHandles; h++)
+        {
+            symbolArray[s].signal[h] = 0;
+        }
+    }
+
+    if (signal_mode == ENUM_MODE_SIGNAL::DISABLE)
+        return;
     if (signal_mode == MODE_SIGNAL_MANUAL)
     {
         IncGetSetSignalManual();
@@ -524,8 +537,8 @@ void MainSignal()
     bool signalcombination = (combi_signal == AND);
     for (int i = 0; i < totalSymbols; i++)
     {
-        symbolArray[i].finalsignal = 0;
-
+        bool flagOrbuy = false;
+        bool flagOrsell = false;
         bool allSignalsBuy = true;
         bool allSignalsSell = true;
         bool hasActiveHandle = false; // Flag untuk menandai ada handle aktif
@@ -554,10 +567,10 @@ void MainSignal()
                     }
                     else
                     {
-                        allSignalsBuy = false;
+
                         if (symbolArray[i].signal[j] == 1)
                         {
-                            allSignalsBuy = true;
+                            flagOrbuy = true;
                         }
                     }
                 }
@@ -577,10 +590,9 @@ void MainSignal()
                     }
                     else
                     {
-                        allSignalsSell = false;
                         if (symbolArray[i].signal[j] == -1)
                         {
-                            allSignalsSell = true;
+                            flagOrsell = true;
                         }
                     }
                 }
@@ -590,28 +602,28 @@ void MainSignal()
         // Update final signal jika ada minimal 1 handle aktif
         if (hasActiveHandle)
         {
-            if (allSignalsBuy && hasActiveBuy)
+            if (signalcombination)
             {
-                symbolArray[i].finalsignal = 1;
-                if (debug == ON)
-                    Print("Final Signal Update: ", symbolArray[i].symbol, " = 1 (BUY)");
-            }
-            else if (allSignalsSell && hasActiveSell)
-            {
-                symbolArray[i].finalsignal = -1;
-                if (debug == ON)
-                    Print("Final Signal Update: ", symbolArray[i].symbol, " = -1 (SELL)");
+                if (allSignalsBuy && hasActiveBuy)
+                {
+                    symbolArray[i].finalsignal = 1;
+                    if (debug == ON)
+                        Print("Final Signal Update: ", symbolArray[i].symbol, " = 1 (BUY)");
+                }
+                else if (allSignalsSell && hasActiveSell)
+                {
+                    symbolArray[i].finalsignal = -1;
+                    if (debug == ON)
+                        Print("Final Signal Update: ", symbolArray[i].symbol, " = -1 (SELL)");
+                }
             }
             else
             {
-                symbolArray[i].finalsignal = 0;
+                if (flagOrbuy && hasActiveBuy)
+                    symbolArray[i].finalsignal = 1;
+                else if (flagOrsell && hasActiveSell)
+                    symbolArray[i].finalsignal = -1;
             }
-        }
-        else
-        {
-            symbolArray[i].finalsignal = 0;
-            if (debug == ON)
-                Print("Final Signal Update: ", symbolArray[i].symbol, " = 0 (No active handles)");
         }
     }
 }
@@ -631,7 +643,8 @@ void IncGetDataSymbol()
                 " isBuy: ", symbolArray[i].isBuy[j],
                 " isSell: ", symbolArray[i].isSell[j],
                 " timeframe: ", symbolArray[i].timeframe[j],
-                " signal_type: ", symbolArray[i].signal_type[j]);
+                " signal_type: ", symbolArray[i].signal_type[j],
+                "signal_base: ", symbolArray[i].signalBase);
         }
         Print("================================================");
         Print("finall signal: ", symbolArray[i].finalsignal);
@@ -642,6 +655,7 @@ void IncGetDataSymbol()
 void MainOrder()
 {
 
+    bool flagsignal = false;
     // Jika ada signal Base jalankan ini dulu
     if (multi_symbol == ENUM_SYMBOL_TYPE::SYMBOL_BASE)
     {
@@ -651,13 +665,6 @@ void MainOrder()
                 continue;
             if (symbolArray[i].finalsignal != symbolArray[i].signalBase)
                 symbolArray[i].finalsignal = 0;
-            if (debug == ON)
-            {
-                Print("Signal ditolak karena tidak sesuai dengan base signal. Symbol: ",
-                      symbolArray[i].symbol,
-                      " Final Signal: ", symbolArray[i].finalsignal,
-                      " Base Signal: ", symbolArray[i].signalBase);
-            }
         }
     }
     trade.SetExpertMagicNumber(magic_number);
@@ -756,7 +763,6 @@ void MainOrder()
 
 bool IncFilterOrder(int n)
 {
-
     string symbol = symbolArray[n].symbol;
 
     if (trading_direction != ALL)
@@ -775,9 +781,6 @@ bool IncFilterOrder(int n)
     }
 
     int total_positions = PositionsTotal();
-    if (total_positions == 0) // Kondisi 1: belum ada order sama sekali
-        return true;
-
     switch (one_order_type)
     {
     case ONE_ORDER_PER_SYMBOL:
@@ -894,7 +897,7 @@ bool IncFilterOrder(int n)
         }
         double current_price = SymbolInfoDouble(symbol, SYMBOL_ASK);
         double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
-        double min_distance = grid_min * point;
+        double min_distance = (grid_min > 0) ? grid_min * point : 30 * point;
         double highest_price = 0;
         double lowest_price = 0;
         double last_price = 0;
@@ -1042,7 +1045,7 @@ bool IncFilterOrder(int n)
         }
 
         // Cek maksimum grid untuk symbol ini
-        if (t >= max_grid)
+        if (max_grid > 0 && t >= max_grid)
         {
             if (debug == ON)
                 Print("Grid order: ", symbol, " sudah mencapai max grid (", max_grid, ")");
@@ -1712,8 +1715,9 @@ void IncGetSetSignalManual()
                 }
             }
         }
+        break;
     }
-    case IND_BOLLINGER_BANDS:
+    case ENUM_INDICATOR_TYPE::IND_BOLLINGER_BANDS:
     {
         double tempUpper[], tempLower[];
         double tempBufferClose[];

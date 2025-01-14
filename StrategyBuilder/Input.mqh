@@ -23,38 +23,38 @@ input string _Lll = "========== ( SETTING OPEN ORDER) ==========";            //
 input ENUM_TRADING_DIRECTION trading_direction = ENUM_TRADING_DIRECTION::ALL; // Mode Order
 input ENUM_LOT_TYPE lot_type = ENUM_LOT_TYPE::LOT_FIXED;                      // Mode Lot Option
 input double lot = 0.01;                                                      // Mode Lot Fixed
-input int lot_balance = 500;                                                  // Mode Lot Balance (Balance / Lot)
+input int lot_balance = 100;                                                  // Mode Lot Balance (Balance / Lot)
 input double risk_percent = 1.0;                                              // Mode Lot Risk Percentage (Percentage Calc Stoploss)
-input double max_lot = 0.1;                                                   // Max Lot
-input int Stoploss = 100;                                                     // Stop Loss (Point)
+input double max_lot = 1;                                                     // Max Lot
+input int Stoploss = 0;                                                       // Stop Loss (Point)
 input int Takeprofit = 0;                                                     // Take Profit (Point)
 input int magic_number = 123456;                                              // Magic Number
 input string komment = "Strategy Builder";                                    // Comment
 
-input string _lll = "======= (MAX ORDER / LIMIT ORDER / GRID) ======="; // ​
-input ENUM_ONE_ORDER_TYPE one_order_type = ONE_ORDER_PER_SYMBOL;        // Mode Grid dan Limit
-input ENUM_GRID_DIRECTION grid_direction_setting = GRID_AUTO_FOLLOW;    // Mode Grid Option
-input ENUM_ON_OFF mode_grid_timeframe = OFF;                            // Mode Grid Timeframe
-input ENUM_TIMEFRAMES one_order_timeframe = PERIOD_M1;                  // Mode Timeframe & Mode Grid , (Mode Grid Bisa On Off)
-input int min_distance_points = 0;                                      // Min Jarak Order (Mode Custom dan Mode Pertimeframe)
-input int max_order = 0;                                                // Max Order Per Symbol (Mode Custom)
-input int max_order_total = 0;                                          // Max Order Total (Mode Custom)
-input int grid_min = 200;                                               // Grid Min Jarak Order Dengan Order Sebelumnya (Profit / Loss Point)
-input int max_grid = 5;                                                 // Grid Max Open Order
-input ENUM_LOT_MODE grid_lot_mode = GRID_DISABLE;                       // Grid Mode Lot
-input double fixed_lot = 0.01;                                          // Grid Fixed Lot
-input double grid_add_value = 0.01;                                     // Grid Add Lot
-input double martingale_multiplier = 2.0;                               // Grid Multiplier Lot
-input double grid_max_lot = 0.1;                                        // Grid Max Lot
-input string grid_lot_custom = "0,01,0.02,0.03";                        // Grid Lot Custom (ex: 0,01,0.02,0.03)
-input string _sdf = "========== ( SETTING FILTER) ==========";          // ​
-input ENUM_ON_OFF setting_filter = ON;                                  // On Off Filter validasi
-input int max_spread = 35;                                              // Max Spread (0 = No Max Spread)
-input int jam_start = 2;                                                // Jam Start (0 = No Jam Start)
-input int jam_end = 22;                                                 // Jam End (0 = No Jam End)
-input ENUM_DAY_INDO no_day_trading1 = Disable;                          // No Day Trading 1
-input ENUM_DAY_INDO no_day_trading2 = Disable;                          // No Day Trading 2
-sinput string _sdfd = "========== ( FITUR TAMBAHAN) ==========";        // ​
+input string _lll = "======= (MAX ORDER / LIMIT ORDER / GRID) =======";               // ​
+input ENUM_ONE_ORDER_TYPE one_order_type = ENUM_ONE_ORDER_TYPE::ORDER_MODE_GRID_LOSS; // Mode Grid dan Limit
+input ENUM_GRID_DIRECTION grid_direction_setting = GRID_AUTO_FOLLOW;                  // Mode Grid Option
+input ENUM_ON_OFF mode_grid_timeframe = ON;                                           // Mode Grid Timeframe
+input ENUM_TIMEFRAMES one_order_timeframe = PERIOD_H1;                                // Mode Timeframe & Mode Grid , (Mode Grid Bisa On Off)
+input int min_distance_points = 0;                                                    // Min Jarak Order (Mode Custom dan Mode Pertimeframe)
+input int max_order = 0;                                                              // Max Order Per Symbol (Mode Custom)
+input int max_order_total = 0;                                                        // Max Order Total (Mode Custom)
+input int grid_min = 200;                                                             // Grid Min Jarak Order Dengan Order Sebelumnya (Profit / Loss Point)
+input int max_grid = 0;                                                               // Grid Max Open Order
+input ENUM_LOT_MODE grid_lot_mode = ENUM_LOT_MODE::GRID_LOT_ADD;                      // Grid Mode Lot
+input double fixed_lot = 0.01;                                                        // Grid Fixed Lot
+input double grid_add_value = 0.01;                                                   // Grid Add Lot
+input double martingale_multiplier = 2.0;                                             // Grid Multiplier Lot
+input double grid_max_lot = 0;                                                        // Grid Max Lot
+input string grid_lot_custom = "0,01,0.02,0.03";                                      // Grid Lot Custom (ex: 0,01,0.02,0.03)
+input string _sdf = "========== ( SETTING FILTER) ==========";                        // ​
+input ENUM_ON_OFF setting_filter = ON;                                                // On Off Filter validasi
+input int max_spread = 35;                                                            // Max Spread (0 = No Max Spread)
+input int jam_start = 2;                                                              // Jam Start (0 = No Jam Start)
+input int jam_end = 22;                                                               // Jam End (0 = No Jam End)
+input ENUM_DAY_INDO no_day_trading1 = Disable;                                        // No Day Trading 1
+input ENUM_DAY_INDO no_day_trading2 = Disable;                                        // No Day Trading 2
+sinput string _sdfd = "========== ( FITUR TAMBAHAN) ==========";                      // ​
 // input ENUM_ON_OFF iBreakEven = OFF;                                     // Break Even
 input double iBreakeven_dollar = 0; // Break Even Dollar
 input double iBreakeven_point = 0;  // Break Even Poin
@@ -63,20 +63,20 @@ input double iBreakeven_point = 0;  // Break Even Poin
 
 input string _ll3 = "========== ( SETTING MODE SIGNAL) ==========";                  // ​
 input ENUM_STRATEGY_COMBINATION combi_signal = AND;                                  // Signal Combination
-input ENUM_MODE_SIGNAL signal_mode = ENUM_MODE_SIGNAL::DISABLE;                      // Mode Signal
-input ENUM_SIGNAL_AUTO signal_auto = ENUM_SIGNAL_AUTO::SIGNAL_1;                     // Signal Auto
+input ENUM_MODE_SIGNAL signal_mode = ENUM_MODE_SIGNAL::MODE_SIGNAL_MULTI;            // Mode Signal
+input ENUM_SIGNAL_AUTO signal_auto = ENUM_SIGNAL_AUTO::DISABLE;                      // Signal Auto
 input ENUM_INDICATOR_TYPE signal_manual = ENUM_INDICATOR_TYPE::IND_MOVING_AVERAGE;   // Signal Manual
 input ENUM_SIGNAL_MANUAL_TYPE signal_manual_type = ENUM_SIGNAL_MANUAL_TYPE::UP_DOWN; // Signal Manual Type
 input int siganl_manual_total = 3;                                                   // Signal Manual Total
-input string signal_manual_period = "10,20,30";                                      // Signal Manual Period
-input string signal_manual_timeframe = "M1,M5,M15";                                  // Signal Manual Timeframe
+input string signal_manual_period = "20";                                            // Signal Manual Period
+input string signal_manual_timeframe = "M5,M15,H1";                                  // Signal Manual Timeframe
 
 input string ma1 = "========== (MA) 1# indikator MA =========="; // ​
-input ENUM_ON_OFF ma1_active = OFF;                              // On Off Moving Averaging
+input ENUM_ON_OFF ma1_active = ON;                               // On Off Moving Averaging
 input ENUM_SIGNAL_TYPE ma1_type = ENUM_SIGNAL_TYPE::UP_DOWN;     // Signal Type
 input ENUM_ACTIVE_DISABLE ma1_buy = ACTIVE;                      // Signal Buy
 input ENUM_ACTIVE_DISABLE ma1_sell = ACTIVE;                     // Signal Sell
-input ENUM_TIMEFRAMES ma1_timeframe = PERIOD_M5;                 // Moving Average TimeFrame
+input ENUM_TIMEFRAMES ma1_timeframe = PERIOD_D1;                 // Moving Average TimeFrame
 input int ma1_periode = 14;                                      // Moving Average Period Line
 input int ma1_shift = 0;                                         // Moving Average Shift
 input ENUM_MA_METHOD ma1_method = MODE_SMA;                      // Moving Average Method
@@ -137,8 +137,8 @@ input ENUM_APPLIED_PRICE ma6_price = PRICE_CLOSE;                // Moving Avera
 //============================== INDIKATOR BB ================================
 
 input string _bb_ = "========== (BB) 1# indikator BB ==========";                // ​
-input ENUM_ON_OFF bb1_active = OFF;                                              // On Off Bolinger Bands
-input ENUM_BB_SIGNAL_TYPE bb1_type = ENUM_BB_SIGNAL_TYPE::CROSS_UP_DOWN_REVERSE; // Signal Type
+input ENUM_ON_OFF bb1_active = ON;                                               // On Off Bolinger Bands
+input ENUM_BB_SIGNAL_TYPE bb1_type = ENUM_BB_SIGNAL_TYPE::UP_DOWN_REVERSE;       // Signal Type
 input ENUM_ACTIVE_DISABLE bb1_buy = ACTIVE;                                      // Signal Buy
 input ENUM_ACTIVE_DISABLE bb1_sell = ACTIVE;                                     // Signal Sell
 input ENUM_TIMEFRAMES bb1_timeframe = PERIOD_M5;                                 // Bolinger Bands TimeFrame

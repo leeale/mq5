@@ -31,6 +31,7 @@ enum ENUM_SIGNAL_AUTO
     SIGNAL_4, // MA + Stochastic
     SIGNAL_5, // BB Squeeze + Momentum
     SIGNAL_6, // Triple MA Cross
+    DISABLE,  // Disable
 };
 
 enum ENUM_DAY_INDO

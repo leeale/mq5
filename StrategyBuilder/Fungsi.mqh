@@ -84,6 +84,7 @@ ENUM_TIMEFRAMES StringToTimeframe(string tf_string)
 
 int GetSignalBase(string symbol, BaseSymbol baseSymbol)
 {
+    Print("GetSignalBase: ", symbol, " ", baseSymbol);
     string baseStr = GetBaseSymbolString(baseSymbol);
     bool isBaseFirst = (StringSubstr(symbol, 0, 3) == baseStr);
     bool isBaseSecond = (StringSubstr(symbol, 3, 3) == baseStr);
@@ -165,6 +166,8 @@ string GetBaseSymbolString(BaseSymbol baseSymbol)
         return "CHF";
     case AUD:
         return "AUD";
+    case NZD:
+        return "NZD";
     }
     return ""; // Default: return empty string jika tidak ada yang cocok
 }
