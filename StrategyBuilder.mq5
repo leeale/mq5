@@ -2,8 +2,6 @@
 #property copyright "Copyright 2024, Ali Usman"
 #property version "1.00"
 #property strict
-#property script_show_inputs
-
 #include "StrategyBuilder/Input.mqh"
 #include "StrategyBuilder/Fungsi.mqh"
 

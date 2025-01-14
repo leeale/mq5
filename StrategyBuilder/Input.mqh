@@ -35,7 +35,7 @@ input string _lll = "======= (MAX ORDER / LIMIT ORDER / GRID) =======";         
 input ENUM_ONE_ORDER_TYPE one_order_type = ENUM_ONE_ORDER_TYPE::ORDER_MODE_GRID_LOSS; // Mode Grid dan Limit
 input ENUM_GRID_DIRECTION grid_direction_setting = GRID_AUTO_FOLLOW;                  // Mode Grid Option
 input ENUM_ON_OFF mode_grid_timeframe = ON;                                           // Mode Grid Timeframe
-input ENUM_TIMEFRAMES one_order_timeframe = PERIOD_H1;                                // Mode Timeframe & Mode Grid , (Mode Grid Bisa On Off)
+input ENUM_TIMEFRAMES one_order_timeframe = PERIOD_H4;                                // Mode Timeframe & Mode Grid , (Mode Grid Bisa On Off)
 input int min_distance_points = 0;                                                    // Min Jarak Order (Mode Custom dan Mode Pertimeframe)
 input int max_order = 0;                                                              // Max Order Per Symbol (Mode Custom)
 input int max_order_total = 0;                                                        // Max Order Total (Mode Custom)
@@ -72,7 +72,7 @@ input string signal_manual_period = "20";                                       
 input string signal_manual_timeframe = "M5,M15,H1";                                  // Signal Manual Timeframe
 
 input string ma1 = "========== (MA) 1# indikator MA =========="; // ​
-input ENUM_ON_OFF ma1_active = ON;                               // On Off Moving Averaging
+input ENUM_ON_OFF ma1_active = OFF;                              // On Off Moving Averaging
 input ENUM_SIGNAL_TYPE ma1_type = ENUM_SIGNAL_TYPE::UP_DOWN;     // Signal Type
 input ENUM_ACTIVE_DISABLE ma1_buy = ACTIVE;                      // Signal Buy
 input ENUM_ACTIVE_DISABLE ma1_sell = ACTIVE;                     // Signal Sell
@@ -137,7 +137,7 @@ input ENUM_APPLIED_PRICE ma6_price = PRICE_CLOSE;                // Moving Avera
 //============================== INDIKATOR BB ================================
 
 input string _bb_ = "========== (BB) 1# indikator BB ==========";                // ​
-input ENUM_ON_OFF bb1_active = ON;                                               // On Off Bolinger Bands
+input ENUM_ON_OFF bb1_active = OFF;                                              // On Off Bolinger Bands
 input ENUM_BB_SIGNAL_TYPE bb1_type = ENUM_BB_SIGNAL_TYPE::UP_DOWN_REVERSE;       // Signal Type
 input ENUM_ACTIVE_DISABLE bb1_buy = ACTIVE;                                      // Signal Buy
 input ENUM_ACTIVE_DISABLE bb1_sell = ACTIVE;                                     // Signal Sell
