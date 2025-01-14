@@ -2,17 +2,17 @@
 enum ENUM_MODE_SIGNAL
 {
     MODE_SIGNAL_MANUAL, // Mode Signal Manual
-    MODE_SIGNAL_AUTO,   // Mode Signal Auto
-    MODE_SIGNAL_MULTI,  // Mode Multi Indikator
-    DISABLE,            // Disable
+    // MODE_SIGNAL_AUTO,   // Mode Signal Auto
+    MODE_SIGNAL_MULTI, // Mode Multi Indikator
+    DISABLE,           // Disable
 };
 
 enum ENUM_SIGNAL_MANUAL_TYPE
 {
-    UP_DOWN,         // Up And Down
-    UP_DOWN_REVERSE, // Up And Down Reverse
-    CROSS,           // Cross
-    CROSS_REVERSE    // Cross Reverse
+    UP_DOWN,              // Up And Down
+    UP_DOWN_REVERSE,      // Up And Down Reverse
+    CROSS_FOLLOW,         // Cross Follow Trend
+    CROSS_FOLLOW_REVERSE, // Cross Follow Trend Reverse
 
 };
 
@@ -21,30 +21,16 @@ enum ENUM_INDICATOR_TYPE
     IND_BOLLINGER_BANDS, // Bollinger Bands
     IND_MOVING_AVERAGE,  // Moving Average
     IND_RSI,             // Relative Strength Index
-    IND_MACD,            // MACD
-    IND_STOCHASTIC,      // Stochastic
-    IND_ATR,             // ATR
-    IND_ADX,             // ADX
-    IND_CCI              // CCI
 };
 
 enum ENUM_SIGNAL_AUTO
 {
-    SIGNAL_1,  // Reversal BB + RSI
-    SIGNAL_2,  // MA Cross + RSI
-    SIGNAL_3,  // BB + MACD + RSI
-    SIGNAL_4,  // MA + Stochastic
-    SIGNAL_5,  // BB Squeeze + Momentum
-    SIGNAL_6,  // Triple MA Cross
-    SIGNAL_7,  // RSI + Stochastic + MACD
-    SIGNAL_8,  // Ichimoku Cloud + RSI
-    SIGNAL_9,  // MA + ADX + CCI
-    SIGNAL_10, // BB + SuperTrend
-    SIGNAL_11, // Pivot + RSI + Volume
-    SIGNAL_12, // ZigZag + MA
-    SIGNAL_13, // Pattern + Volume
-    SIGNAL_14, // MA + ATR + RSI
-    SIGNAL_15  // Custom Combination
+    SIGNAL_1, // Reversal BB + RSI
+    SIGNAL_2, // MA Cross + RSI
+    SIGNAL_3, // BB + MACD + RSI
+    SIGNAL_4, // MA + Stochastic
+    SIGNAL_5, // BB Squeeze + Momentum
+    SIGNAL_6, // Triple MA Cross
 };
 
 enum ENUM_DAY_INDO
@@ -67,7 +53,9 @@ enum BaseSymbol
     JPY, // JPY
     CAD, // CAD
     CHF, // CHF
-    AUD  // AUD
+    AUD, // AUD
+    NZD  // NZD
+
 };
 
 enum ENUM_TRADING_DIRECTION

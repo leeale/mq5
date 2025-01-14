@@ -11,6 +11,77 @@ bool m_isBalanceLoaded;
 CPositionInfo pos;
 CTrade trade;
 
+void FillArrayWithLastValue(string &dest[], string &source[], int totalSize)
+{
+    int sourceSize = ArraySize(source);
+    if (sourceSize == 0 || totalSize <= 0)
+        return;
+
+    // Resize array tujuan
+    ArrayResize(dest, totalSize);
+
+    // Copy array sumber dulu
+    ArrayCopy(dest, source);
+
+    // Ambil nilai terakhir dari source
+    string lastValue = source[sourceSize - 1];
+
+    // Isi sisa array dengan nilai terakhir
+    for (int i = sourceSize; i < totalSize; i++)
+    {
+        dest[i] = lastValue;
+    }
+}
+
+ENUM_TIMEFRAMES StringToTimeframe(string tf_string)
+{
+    string timeframe = tf_string;
+    StringToUpper(timeframe); // Konversi ke uppercase
+
+    // Cek format text
+    if (timeframe == "M1")
+        return PERIOD_M1;
+    if (timeframe == "M5")
+        return PERIOD_M5;
+    if (timeframe == "M15")
+        return PERIOD_M15;
+    if (timeframe == "M30")
+        return PERIOD_M30;
+    if (timeframe == "H1")
+        return PERIOD_H1;
+    if (timeframe == "H4")
+        return PERIOD_H4;
+    if (timeframe == "D1")
+        return PERIOD_D1;
+    if (timeframe == "W1")
+        return PERIOD_W1;
+    if (timeframe == "MN1")
+        return PERIOD_MN1;
+
+    // Cek format angka
+    if (timeframe == "1")
+        return PERIOD_M1;
+    if (timeframe == "5")
+        return PERIOD_M5;
+    if (timeframe == "15")
+        return PERIOD_M15;
+    if (timeframe == "30")
+        return PERIOD_M30;
+    if (timeframe == "60")
+        return PERIOD_H1;
+    if (timeframe == "240")
+        return PERIOD_H4;
+    if (timeframe == "1440")
+        return PERIOD_D1;
+    if (timeframe == "10080")
+        return PERIOD_W1;
+    if (timeframe == "43200")
+        return PERIOD_MN1;
+
+    Print("Timeframe tidak valid: ", tf_string, " menggunakan default M1");
+    return PERIOD_M1;
+}
+
 int GetSignalBase(string symbol, BaseSymbol baseSymbol)
 {
     string baseStr = GetBaseSymbolString(baseSymbol);
@@ -70,6 +141,8 @@ bool IsCorrelatedSymbol(string pair, BaseSymbol baseSymbol)
         return (StringFind(pair, "CHF") >= 0); // Semua pasangan yang mengandung CHF
     case AUD:
         return (StringFind(pair, "AUD") >= 0); // Semua pasangan yang mengandung AUD
+    case NZD:
+        return (StringFind(pair, "NZD") >= 0); // Semua pasangan yang mengandung NZD
     }
     return false; // Default: tidak ada pasangan yang cocok
 }

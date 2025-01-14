@@ -18,11 +18,11 @@ struct symbolInfo
     bool isBuy[];
     bool isSell[];
     ENUM_TIMEFRAMES timeframe[];
-    int signal_type[];
+    int signal_type[]; // Hnya aktif di signal multi untuuk mmbandingkan signal dengan kondisi indikator
 };
 symbolInfo symbolArray[];
 // variable Global
-int totalHandles;
+int totalHandles = 1;
 int totalSymbols;
 double lotGrid;
 
@@ -52,56 +52,42 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
     }
 }
 
-int OnInit()
+void InitMain()
 {
-    totalHandles = 11;
+
+    EventSetTimer(5);
     CreateCloseButton();
     CreateCloseButtonSymbol();
     SetTargetBalance();
-    SetDataSymbol();
-    SetDataHandle();
-    EventSetTimer(5);
+}
+
+int OnInit()
+{
+    InitMain();
+    InitSymbol();
+    InitHandle();
     return (INIT_SUCCEEDED);
 }
 void OnTick()
 {
-    TargetOnChart();
-    HiddenTP_SL();
-    FiturTambahan();
+    MainTargetOnChart();
+    MainHiddenTPSL();
+    MainAddFeature();
 }
 void OnTimer()
 {
-    if (power == OFF)
+    bool isDebug = (debug == ON);
+    string message = "";
+    if (IncMainFilterGeneral(message) != FILTER_PASS)
+    {
+        if (isDebug)
+            Print(message);
         return;
-    // Reset  signal di awal
-    for (int n = 0; n < totalSymbols; n++)
-    {
-        symbolArray[n].finalsignal = 0;
-        for (int m = 0; m < totalHandles; m++)
-            symbolArray[n].signal[m] = 0;
     }
-    // Get signal
-    for (int n = 0; n < totalSymbols; n++)
-    {
-        string symbol = symbolArray[n].symbol;
-        if (!IsFilterCondition(symbol))
-            continue;
-        GetSetSignal(n);
-    }
-    SetFinalSignal();
-    CekSignalBase();
-    OpenPosition();
-    // Debug info
-    if (debug == ON)
-    {
-        for (int i = 0; i < totalSymbols; i++)
-        {
-            Print("Symbol: ", symbolArray[i].symbol,
-                  " Final Signal: ", symbolArray[i].finalsignal,
-                  " Signal Base: ", symbolArray[i].signalBase);
-        }
-    }
-    // GetDataSymbol();
+    MainGetSetSignal();
+    MainSignal();
+    MainOrder();
+    IncGetDataSymbol();
 }
 
 void OnDeinit(const int reason)
@@ -127,23 +113,41 @@ void OnDeinit(const int reason)
 enum ENUM_FILTER_RESULT
 {
     FILTER_PASS,        // Lolos filter
-    FILTER_HIGH_SPREAD, // Spread terlalu tinggi
     FILTER_WRONG_TIME,  // Diluar jam trading
-    FILTER_HOLIDAY      // Hari libur
+    FILTER_HOLIDAY,     // Hari libur
+    FILTER_POWER_OFF,   // Power off
+    FILTER_SIGNAL_MODE, // Signal mode disabled
+
 };
 
-ENUM_FILTER_RESULT FilterCondition(string symbol, string &message)
+ENUM_FILTER_RESULT IncMainFilterGeneral(string &message)
 {
 
-    // Filter jam trading
+    if (power == OFF)
+    {
+        message = "Filter: power off / signal mode disabled";
+        return FILTER_POWER_OFF;
+    }
+    if (signal_mode == ENUM_MODE_SIGNAL::DISABLE)
+    {
+        message = "Filter: signal mode disabled";
+        return FILTER_SIGNAL_MODE;
+    }
+
+    if (setting_filter == OFF)
+    {
+        message = "Filter: disabled";
+        return FILTER_PASS;
+    }
+
     datetime time = TimeCurrent();
     MqlDateTime dt;
     TimeToStruct(time, dt);
     // Cek jam trading
     if ((dt.hour < jam_start || dt.hour >= jam_end) && (jam_start != 0 && jam_end != 0))
     {
-        message = StringFormat("Filter: %s diluar jam trading (%d:%d)",
-                               symbol, dt.hour, dt.min);
+        message = StringFormat("Filter: diluar jam trading (%d:%d)",
+                               dt.hour, dt.min);
         return FILTER_WRONG_TIME;
     }
 
@@ -152,33 +156,23 @@ ENUM_FILTER_RESULT FilterCondition(string symbol, string &message)
     {
         if (dt.day_of_week == no_day_trading1 || dt.day_of_week == no_day_trading2)
         {
-            message = StringFormat("Filter: %s tidak trading di hari %s",
-                                   symbol,
+            message = StringFormat("Filter: tidak trading di hari %s",
+
                                    EnumToString((ENUM_DAY_INDO)dt.day_of_week));
             return FILTER_HOLIDAY;
         }
     }
 
-    // Filter spread
-    int spread = (int)SymbolInfoInteger(symbol, SYMBOL_SPREAD);
-    if (spread > max_spread)
-    {
-        message = StringFormat("Filter: %s spread terlalu tinggi (%d)", symbol, spread);
-        if (max_spread != 0)
-            return FILTER_HIGH_SPREAD;
-    }
-
-    message = StringFormat("Filter: %s passed all conditions", symbol);
+    message = ("Filter: passed all conditions");
     return FILTER_PASS;
 }
 
-void SetDataSymbol()
+void InitSymbol()
 {
 
     ArrayFree(symbolArray);
 
     string symboldata[];
-    // Set total symbol
     if (multi_symbol == ENUM_SYMBOL_TYPE::MULTI_SYMBOL)
         totalSymbols = SymbolsTotal(true);
     else if (multi_symbol == ENUM_SYMBOL_TYPE::SYMBOL_CUSTOM)
@@ -247,10 +241,7 @@ void SetDataSymbol()
         }
     }
     else
-
-    // if (multi_symbol != ENUM_SYMBOL_TYPE::SYMBOL_BASE)
     {
-
         for (int i = 0; i < totalSymbols; i++)
         {
             // Reset signalBase ke 0 untuk tipe symbol lainnya
@@ -271,8 +262,10 @@ void SetDataSymbol()
         }
     }
 }
-void SetDataHandle()
+void InitHandle()
 {
+    totalHandles = (signal_mode == MODE_SIGNAL_MANUAL) ? siganl_manual_total : 11;
+    Print("totalHandles = ", totalHandles);
     for (int i = 0; i < totalSymbols; i++)
     {
         // inisialisasi
@@ -291,300 +284,107 @@ void SetDataHandle()
             symbolArray[i].isActive[j] = false;
             symbolArray[i].isBuy[j] = false;
             symbolArray[i].isSell[j] = false;
+            symbolArray[i].timeframe[j] = 0;
+            symbolArray[i].signal_type[j] = 0;
 
-            // Set Indikator
-            if (j <= 5)
-                IndikatorMa(i, j);
-            else
-                IndikatorBB(i, j);
-        }
-    }
-}
-
-void IndikatorMa(int i, int j)
-{
-    switch (j)
-    {
-    case 0: // MA1
-        symbolArray[i].isBuy[j] = (ma1_buy == ACTIVE);
-        symbolArray[i].isSell[j] = (ma1_sell == ACTIVE);
-        if (ma1_active == ON)
-        {
-            symbolArray[i].handle[j] = iMA(symbolArray[i].symbol,
-                                           ma1_timeframe,
-                                           ma1_periode,
-                                           ma1_shift,
-                                           ma1_method,
-                                           ma1_price);
-            if (symbolArray[i].handle[j] != INVALID_HANDLE)
+            if (signal_mode == MODE_SIGNAL_MULTI)
             {
+                if (j <= 5)
+                    IncHandleMa(i, j);
+                else
+                    IncHandleBB(i, j);
+            }
+            else if (signal_mode == MODE_SIGNAL_MANUAL)
+            {
+                // Inisialisasi
+                symbolArray[i].signal[j] = 0;
                 symbolArray[i].isActive[j] = true;
-                symbolArray[i].timeframe[j] = ma1_timeframe;
-                symbolArray[i].signal_type[j] = ma1_type;
-                if (debug == ON)
-                    Print("handle MA 1: " + symbolArray[i].symbol + " berhasil dibuat");
+                symbolArray[i].isBuy[j] = true;
+                symbolArray[i].isSell[j] = true;
+                symbolArray[i].timeframe[j] = 0;
+                symbolArray[i].signal_type[j] = 0;
             }
         }
-        break;
-
-    case 1: // MA2
-        symbolArray[i].isBuy[j] = (ma2_buy == ACTIVE);
-        symbolArray[i].isSell[j] = (ma2_sell == ACTIVE);
-        if (ma2_active == ON)
+        if (signal_mode == MODE_SIGNAL_MULTI)
         {
-            symbolArray[i].handle[j] = iMA(symbolArray[i].symbol,
-                                           ma2_timeframe,
-                                           ma2_periode,
-                                           ma2_shift,
-                                           ma2_method,
-                                           ma2_price);
-            if (symbolArray[i].handle[j] != INVALID_HANDLE)
+            // Hapus handle yang tidak aktif
+            for (int j = totalHandles - 1; j >= 0; j--) // Loop dari belakang
             {
-                symbolArray[i].isActive[j] = true;
-                symbolArray[i].timeframe[j] = ma2_timeframe;
-                symbolArray[i].signal_type[j] = ma2_type;
-                if (debug == ON)
-                    Print("handle MA 2: " + symbolArray[i].symbol + " berhasil dibuat");
-            }
-        }
-        break;
-
-    case 2: // MA3
-        symbolArray[i].isBuy[j] = (ma3_buy == ACTIVE);
-        symbolArray[i].isSell[j] = (ma3_sell == ACTIVE);
-        if (ma3_active == ON)
-        {
-            symbolArray[i].handle[j] = iMA(symbolArray[i].symbol,
-                                           ma3_timeframe,
-                                           ma3_periode,
-                                           ma3_shift,
-                                           ma3_method,
-                                           ma3_price);
-            if (symbolArray[i].handle[j] != INVALID_HANDLE)
-            {
-                symbolArray[i].isActive[j] = true;
-                symbolArray[i].timeframe[j] = ma3_timeframe;
-                symbolArray[i].signal_type[j] = ma3_type;
-                if (debug == ON)
-                    Print("handle MA 3: " + symbolArray[i].symbol + " berhasil dibuat");
-            }
-        }
-        break;
-
-    case 3: // MA4
-        symbolArray[i].isBuy[j] = (ma4_buy == ACTIVE);
-        symbolArray[i].isSell[j] = (ma4_sell == ACTIVE);
-        if (ma4_active == ON)
-        {
-            symbolArray[i].handle[j] = iMA(symbolArray[i].symbol,
-                                           ma4_timeframe,
-                                           ma4_periode,
-                                           ma4_shift,
-                                           ma4_method,
-                                           ma4_price);
-            if (symbolArray[i].handle[j] != INVALID_HANDLE)
-            {
-                symbolArray[i].isActive[j] = true;
-                symbolArray[i].timeframe[j] = ma4_timeframe;
-                symbolArray[i].signal_type[j] = ma4_type;
-                if (debug == ON)
-                    Print("handle MA 4: " + symbolArray[i].symbol + " berhasil dibuat");
-            }
-        }
-        break;
-
-    case 4: // MA5
-        symbolArray[i].isBuy[j] = (ma5_buy == ACTIVE);
-        symbolArray[i].isSell[j] = (ma5_sell == ACTIVE);
-        if (ma5_active == ON)
-        {
-            symbolArray[i].handle[j] = iMA(symbolArray[i].symbol,
-                                           ma5_timeframe,
-                                           ma5_periode,
-                                           ma5_shift,
-                                           ma5_method,
-                                           ma5_price);
-            if (symbolArray[i].handle[j] != INVALID_HANDLE)
-            {
-                symbolArray[i].isActive[j] = true;
-                symbolArray[i].timeframe[j] = ma5_timeframe;
-                symbolArray[i].signal_type[j] = ma5_type;
-                if (debug == ON)
-                    Print("handle MA 5: " + symbolArray[i].symbol + " berhasil dibuat");
-            }
-        }
-        break;
-
-    case 5: // MA6
-        symbolArray[i].isBuy[j] = (ma6_buy == ACTIVE);
-        symbolArray[i].isSell[j] = (ma6_sell == ACTIVE);
-        if (ma6_active == ON)
-        {
-            symbolArray[i].handle[j] = iMA(symbolArray[i].symbol,
-                                           ma6_timeframe,
-                                           ma6_periode,
-                                           ma6_shift,
-                                           ma6_method,
-                                           ma6_price);
-            if (symbolArray[i].handle[j] != INVALID_HANDLE)
-            {
-                symbolArray[i].isActive[j] = true;
-                symbolArray[i].timeframe[j] = ma6_timeframe;
-                symbolArray[i].signal_type[j] = ma6_type;
-                if (debug == ON)
-                    Print("handle MA 6: " + symbolArray[i].symbol + " berhasil dibuat");
-            }
-        }
-        break;
-    }
-}
-void IndikatorBB(int i, int j)
-{
-    int bbIndex = j - 6; // Konversi j ke index BB (0-4)
-
-    switch (bbIndex)
-    {
-    case 0: // BB1
-        symbolArray[i].isBuy[j] = (bb1_buy == ACTIVE);
-        symbolArray[i].isSell[j] = (bb1_sell == ACTIVE);
-        if (bb1_active == ON)
-        {
-            symbolArray[i].handle[j] = iBands(symbolArray[i].symbol,
-                                              bb1_timeframe,
-                                              bb1_periode,
-                                              bb1_shift,
-                                              bb1_deviation,
-                                              bb1_price);
-            if (symbolArray[i].handle[j] != INVALID_HANDLE)
-            {
-                symbolArray[i].isActive[j] = true;
-                symbolArray[i].timeframe[j] = bb1_timeframe;
-                symbolArray[i].signal_type[j] = bb1_type;
-                if (debug == ON)
-                    Print("handle BB 1: " + symbolArray[i].symbol + " berhasil dibuat");
-            }
-        }
-        break;
-
-    case 1: // BB2
-        symbolArray[i].isBuy[j] = (bb2_buy == ACTIVE);
-        symbolArray[i].isSell[j] = (bb2_sell == ACTIVE);
-        if (bb2_active == ON)
-        {
-            symbolArray[i].handle[j] = iBands(symbolArray[i].symbol,
-                                              bb2_timeframe,
-                                              bb2_periode,
-                                              bb2_shift,
-                                              bb2_deviation,
-                                              bb2_price);
-            if (symbolArray[i].handle[j] != INVALID_HANDLE)
-            {
-                symbolArray[i].isActive[j] = true;
-                symbolArray[i].timeframe[j] = bb2_timeframe;
-                symbolArray[i].signal_type[j] = bb2_type;
-                if (debug == ON)
-                    Print("handle BB 2: " + symbolArray[i].symbol + " berhasil dibuat");
-            }
-        }
-        break;
-
-    case 2: // BB3
-        symbolArray[i].isBuy[j] = (bb3_buy == ACTIVE);
-        symbolArray[i].isSell[j] = (bb3_sell == ACTIVE);
-        if (bb3_active == ON)
-        {
-            symbolArray[i].handle[j] = iBands(symbolArray[i].symbol,
-                                              bb3_timeframe,
-                                              bb3_periode,
-                                              bb3_shift,
-                                              bb3_deviation,
-                                              bb3_price);
-            if (symbolArray[i].handle[j] != INVALID_HANDLE)
-            {
-                symbolArray[i].isActive[j] = true;
-                symbolArray[i].timeframe[j] = bb3_timeframe;
-                symbolArray[i].signal_type[j] = bb3_type;
-                if (debug == ON)
-                    Print("handle BB 3: " + symbolArray[i].symbol + " berhasil dibuat");
-            }
-        }
-        break;
-
-    case 3: // BB4
-        symbolArray[i].isBuy[j] = (bb4_buy == ACTIVE);
-        symbolArray[i].isSell[j] = (bb4_sell == ACTIVE);
-        if (bb4_active == ON)
-        {
-            symbolArray[i].handle[j] = iBands(symbolArray[i].symbol,
-                                              bb4_timeframe,
-                                              bb4_periode,
-                                              bb4_shift,
-                                              bb4_deviation,
-                                              bb4_price);
-            if (symbolArray[i].handle[j] != INVALID_HANDLE)
-            {
-                symbolArray[i].isActive[j] = true;
-                symbolArray[i].timeframe[j] = bb4_timeframe;
-                symbolArray[i].signal_type[j] = bb4_type;
-                if (debug == ON)
-                    Print("handle BB 4: " + symbolArray[i].symbol + " berhasil dibuat");
-            }
-        }
-        break;
-
-    case 4: // BB5
-        symbolArray[i].isBuy[j] = (bb5_buy == ACTIVE);
-        symbolArray[i].isSell[j] = (bb5_sell == ACTIVE);
-        if (bb5_active == ON)
-        {
-            symbolArray[i].handle[j] = iBands(symbolArray[i].symbol,
-                                              bb5_timeframe,
-                                              bb5_periode,
-                                              bb5_shift,
-                                              bb5_deviation,
-                                              bb5_price);
-            if (symbolArray[i].handle[j] != INVALID_HANDLE)
-            {
-                symbolArray[i].isActive[j] = true;
-                symbolArray[i].timeframe[j] = bb5_timeframe;
-                symbolArray[i].signal_type[j] = bb5_type;
-                if (debug == ON)
-                    Print("handle BB 5: " + symbolArray[i].symbol + " berhasil dibuat");
-            }
-        }
-        break;
-    }
-}
-void GetSetSignal(int i)
-{
-    for (int j = 0; j < totalHandles; j++)
-    {
-        if (symbolArray[i].handle[j] != INVALID_HANDLE)
-        {
-            double value1[];
-            double value2[];
-            ArraySetAsSeries(value1, true);
-            ArraySetAsSeries(value2, true);
-
-            if (j <= 5)
-            {
-                if (BufferMA(symbolArray[i].handle[j], 2, value1))
+                if (!symbolArray[i].isActive[j])
                 {
-                    UpdateSignalMA(i, j, value1);
+                    // Release handle jika ada
+                    if (symbolArray[i].handle[j] != INVALID_HANDLE)
+                        IndicatorRelease(symbolArray[i].handle[j]);
+
+                    // Hapus elemen dari semua array
+                    ArrayRemove(symbolArray[i].handle, j, 1);
+                    ArrayRemove(symbolArray[i].signal, j, 1);
+                    ArrayRemove(symbolArray[i].isActive, j, 1);
+                    ArrayRemove(symbolArray[i].isBuy, j, 1);
+                    ArrayRemove(symbolArray[i].isSell, j, 1);
+                    ArrayRemove(symbolArray[i].timeframe, j, 1);
+                    ArrayRemove(symbolArray[i].signal_type, j, 1);
                 }
             }
-            // Untuk BB (index 6-10)
-            else if (j >= 6 && j <= 10)
+
+            // Update totalHandles untuk symbol ini
+            totalHandles = ArraySize(symbolArray[i].handle);
+            Print("Symbol ", symbolArray[i].symbol, " active handles: ", totalHandles);
+        }
+    }
+    if (signal_mode == MODE_SIGNAL_MANUAL)
+    {
+        incHandleManual();
+    }
+}
+
+void MainGetSetSignal()
+{
+    if (signal_mode == MODE_SIGNAL_MANUAL)
+    {
+        IncGetSetSignalManual();
+        return;
+    }
+
+    for (int i = 0; i < totalSymbols; i++)
+    {
+        string symbol = symbolArray[i].symbol;
+        if ((int)SymbolInfoInteger(symbol, SYMBOL_SPREAD) > max_spread)
+        {
+            if (debug == ON)
+                Print("Symbol " + symbol + " memiliki spread lebih besar dari maksimal spread yang diizinkan");
+            continue;
+        }
+
+        for (int j = 0; j < totalHandles; j++)
+        {
+            if (symbolArray[i].handle[j] != INVALID_HANDLE)
             {
-                if (BufferBB(symbolArray[i].handle[j], 2, value1, value2))
+                double value1[];
+                double value2[];
+                ArraySetAsSeries(value1, true);
+                ArraySetAsSeries(value2, true);
+
+                if (j <= 5)
                 {
-                    UpdateSignalBB(i, j, value1, value2);
+                    if (IncBufferMA(symbolArray[i].handle[j], 2, value1))
+                    {
+                        IncUpdateSignalMA(i, j, value1);
+                    }
+                }
+                // Untuk BB (index 6-10)
+                else if (j >= 6 && j <= 10)
+                {
+                    if (IncBufferBB(symbolArray[i].handle[j], 2, value1, value2))
+                    {
+                        IncUpdateSignalBB(i, j, value1, value2);
+                    }
                 }
             }
         }
     }
 }
-bool BufferBB(int handle, int t, double &value1[], double &value2[])
+bool IncBufferBB(int handle, int t, double &value1[], double &value2[])
 {
     int upper = CopyBuffer(handle, 1, 0, t, value1);
     int lower = CopyBuffer(handle, 2, 0, t, value2);
@@ -592,7 +392,7 @@ bool BufferBB(int handle, int t, double &value1[], double &value2[])
         return true;
     return false;
 }
-bool BufferMA(int handle, int t, double &value1[])
+bool IncBufferMA(int handle, int t, double &value1[])
 {
     int count = CopyBuffer(handle, 0, 0, t, value1);
     if (count == t)
@@ -600,7 +400,7 @@ bool BufferMA(int handle, int t, double &value1[])
     return false;
 }
 
-void UpdateSignalMA(int i, int j, double &value1[])
+void IncUpdateSignalMA(int i, int j, double &value1[])
 {
     double i0 = value1[0];
     double i1 = value1[1];
@@ -655,7 +455,7 @@ void UpdateSignalMA(int i, int j, double &value1[])
         }
     }
 }
-void UpdateSignalBB(int i, int j, double &value1[], double &value2[])
+void IncUpdateSignalBB(int i, int j, double &value1[], double &value2[])
 {
     double upper0 = value1[0];
     double upper1 = value1[1];
@@ -719,11 +519,13 @@ void UpdateSignalBB(int i, int j, double &value1[], double &value2[])
     }
 }
 
-void SetFinalSignal()
+void MainSignal()
 {
     bool signalcombination = (combi_signal == AND);
     for (int i = 0; i < totalSymbols; i++)
     {
+        symbolArray[i].finalsignal = 0;
+
         bool allSignalsBuy = true;
         bool allSignalsSell = true;
         bool hasActiveHandle = false; // Flag untuk menandai ada handle aktif
@@ -813,7 +615,7 @@ void SetFinalSignal()
         }
     }
 }
-void GetDataSymbol()
+void IncGetDataSymbol()
 {
     for (int i = 0; i < totalSymbols; i++)
     {
@@ -828,8 +630,8 @@ void GetDataSymbol()
                 " isActive: ", symbolArray[i].isActive[j],
                 " isBuy: ", symbolArray[i].isBuy[j],
                 " isSell: ", symbolArray[i].isSell[j],
-                "timeframe: ", symbolArray[i].timeframe[j],
-                "signal_type: ", symbolArray[i].signal_type[j]);
+                " timeframe: ", symbolArray[i].timeframe[j],
+                " signal_type: ", symbolArray[i].signal_type[j]);
         }
         Print("================================================");
         Print("finall signal: ", symbolArray[i].finalsignal);
@@ -837,16 +639,34 @@ void GetDataSymbol()
     }
 }
 
-void OpenPosition()
+void MainOrder()
 {
 
+    // Jika ada signal Base jalankan ini dulu
+    if (multi_symbol == ENUM_SYMBOL_TYPE::SYMBOL_BASE)
+    {
+        for (int i = 0; i < totalSymbols; i++)
+        {
+            if (symbolArray[i].finalsignal == 0)
+                continue;
+            if (symbolArray[i].finalsignal != symbolArray[i].signalBase)
+                symbolArray[i].finalsignal = 0;
+            if (debug == ON)
+            {
+                Print("Signal ditolak karena tidak sesuai dengan base signal. Symbol: ",
+                      symbolArray[i].symbol,
+                      " Final Signal: ", symbolArray[i].finalsignal,
+                      " Base Signal: ", symbolArray[i].signalBase);
+            }
+        }
+    }
     trade.SetExpertMagicNumber(magic_number);
 
     for (int i = 0; i < totalSymbols; i++)
     {
         if (symbolArray[i].finalsignal == 0)
             continue;
-        if (!FilterOrder(i))
+        if (!IncFilterOrder(i))
             continue;
 
         string symbol = symbolArray[i].symbol;
@@ -888,7 +708,7 @@ void OpenPosition()
                 tp = bid - (Takeprofit * point);
         }
 
-        double orderlot = CalculateLotSize(symbol);
+        double orderlot = IncCalcLot(symbol);
         Print(orderlot);
         bool order;
         bool hasPosition = false;
@@ -934,7 +754,7 @@ void OpenPosition()
     }
 }
 
-bool FilterOrder(int n)
+bool IncFilterOrder(int n)
 {
 
     string symbol = symbolArray[n].symbol;
@@ -1312,7 +1132,7 @@ bool FilterOrder(int n)
     return true;
 }
 
-void HiddenTP_SL()
+void MainHiddenTPSL()
 {
     if (InpStopLoss == 0 && InpTakeProfit == 0)
         return;
@@ -1387,7 +1207,7 @@ void HiddenTP_SL()
     }
 }
 
-void TargetOnChart()
+void MainTargetOnChart()
 {
     if (m_targetProfit > 0)
     {
@@ -1399,7 +1219,7 @@ void TargetOnChart()
     }
 }
 
-double CalculateLotSize(string symbol)
+double IncCalcLot(string symbol)
 {
     double calculated_lot = lot;
 
@@ -1452,10 +1272,7 @@ double CalculateLotSize(string symbol)
     return calculated_lot;
 }
 
-struct Helper
-{
-};
-void FiturTambahan()
+void MainAddFeature()
 {
     if (IsNewBar(PERIOD_M5))
     {
@@ -1469,38 +1286,503 @@ void FiturTambahan()
         }
     }
 }
-bool IsFilterCondition(string symbol)
-{
 
-    if (setting_filter == OFF)
-        return true;
-    string message = "";
-    if (FilterCondition(symbol, message) != FILTER_PASS)
+void incHandleManual()
+{
+    Print("Manual Handle");
+    string p = signal_manual_period;
+    string t = signal_manual_timeframe;
+    string sep = ",";
+    ushort u_sep = StringGetCharacter(sep, 0);
+
+    // Konvert data ke array
+    string periode[];
+    string tf[];
+    // ArrayResize(periode, totalHandles);
+    // ArrayResize(tf, totalHandles);
+    StringSplit(p, u_sep, periode);
+    StringSplit(t, u_sep, tf);
+
+    // Periksa jumlah input
+    int periodCount = ArraySize(periode);
+    int tfCount = ArraySize(tf);
+
+    // Jika jumlah input tidak sama dengan totalHandles
+    if (periodCount != totalHandles || tfCount != totalHandles)
     {
         if (debug == ON)
-            Print(message);
-        return false;
+            Print("Input tidak sesuai. Menyesuaikan array...");
+        // Mengisi array dengan pola yang diinginkan
+        FillArrayWithLastValue(periode, periode, totalHandles);
+        FillArrayWithLastValue(tf, tf, totalHandles);
     }
-    return true;
-}
 
-void CekSignalBase()
-{
-    if (multi_symbol != ENUM_SYMBOL_TYPE::SYMBOL_BASE)
-        return;
-
+    for (int i = 0; i < totalHandles; i++)
+    {
+        Print(" Timeframe: ", tf[i], " Period: ", periode[i]);
+    }
     for (int i = 0; i < totalSymbols; i++)
     {
-        if (symbolArray[i].finalsignal == 0)
-            continue;
-        if (symbolArray[i].finalsignal != symbolArray[i].signalBase)
-            symbolArray[i].finalsignal = 0;
-        if (debug == ON)
+
+        for (int j = 0; j < totalHandles; j++)
         {
-            Print("Signal ditolak karena tidak sesuai dengan base signal. Symbol: ",
-                  symbolArray[i].symbol,
-                  " Final Signal: ", symbolArray[i].finalsignal,
-                  " Base Signal: ", symbolArray[i].signalBase);
+            symbolArray[i].timeframe[j] = StringToTimeframe(tf[j]);
+            Print("Symbol: ", symbolArray[i].symbol, " Timeframe: ", tf[j]);
+
+            switch (signal_manual)
+            {
+            case ENUM_INDICATOR_TYPE::IND_MOVING_AVERAGE:
+                symbolArray[i].handle[j] = iMA(symbolArray[i].symbol,
+                                               StringToTimeframe(tf[j]),
+                                               (int)periode[j],
+                                               0,
+                                               ENUM_MA_METHOD::MODE_SMA,
+                                               ENUM_APPLIED_PRICE::PRICE_CLOSE);
+                break;
+            case ENUM_INDICATOR_TYPE::IND_BOLLINGER_BANDS:
+                symbolArray[i].handle[j] = iBands(symbolArray[i].symbol,
+                                                  StringToTimeframe(tf[j]),
+                                                  (int)periode[j],
+                                                  0,
+                                                  2.0,
+                                                  ENUM_APPLIED_PRICE::PRICE_CLOSE);
+                break;
+            case ENUM_INDICATOR_TYPE::IND_RSI:
+                symbolArray[i].handle[j] = iRSI(symbolArray[i].symbol,
+                                                StringToTimeframe(tf[j]),
+                                                (int)periode[j],
+                                                ENUM_APPLIED_PRICE::PRICE_CLOSE);
+                break;
+            }
         }
+    }
+}
+
+void IncHandleMa(int i, int j)
+{
+    switch (j)
+    {
+    case 0: // MA1
+        symbolArray[i].isBuy[j] = (ma1_buy == ACTIVE);
+        symbolArray[i].isSell[j] = (ma1_sell == ACTIVE);
+        if (ma1_active == ON)
+        {
+            symbolArray[i].handle[j] = iMA(symbolArray[i].symbol,
+                                           ma1_timeframe,
+                                           ma1_periode,
+                                           ma1_shift,
+                                           ma1_method,
+                                           ma1_price);
+            if (symbolArray[i].handle[j] != INVALID_HANDLE)
+            {
+                symbolArray[i].isActive[j] = true;
+                symbolArray[i].timeframe[j] = ma1_timeframe;
+                symbolArray[i].signal_type[j] = ma1_type;
+                if (debug == ON)
+                    Print("handle MA 1: " + symbolArray[i].symbol + " berhasil dibuat");
+            }
+        }
+        break;
+
+    case 1: // MA2
+        symbolArray[i].isBuy[j] = (ma2_buy == ACTIVE);
+        symbolArray[i].isSell[j] = (ma2_sell == ACTIVE);
+        if (ma2_active == ON)
+        {
+            symbolArray[i].handle[j] = iMA(symbolArray[i].symbol,
+                                           ma2_timeframe,
+                                           ma2_periode,
+                                           ma2_shift,
+                                           ma2_method,
+                                           ma2_price);
+            if (symbolArray[i].handle[j] != INVALID_HANDLE)
+            {
+                symbolArray[i].isActive[j] = true;
+                symbolArray[i].timeframe[j] = ma2_timeframe;
+                symbolArray[i].signal_type[j] = ma2_type;
+                if (debug == ON)
+                    Print("handle MA 2: " + symbolArray[i].symbol + " berhasil dibuat");
+            }
+        }
+        break;
+
+    case 2: // MA3
+        symbolArray[i].isBuy[j] = (ma3_buy == ACTIVE);
+        symbolArray[i].isSell[j] = (ma3_sell == ACTIVE);
+        if (ma3_active == ON)
+        {
+            symbolArray[i].handle[j] = iMA(symbolArray[i].symbol,
+                                           ma3_timeframe,
+                                           ma3_periode,
+                                           ma3_shift,
+                                           ma3_method,
+                                           ma3_price);
+            if (symbolArray[i].handle[j] != INVALID_HANDLE)
+            {
+                symbolArray[i].isActive[j] = true;
+                symbolArray[i].timeframe[j] = ma3_timeframe;
+                symbolArray[i].signal_type[j] = ma3_type;
+                if (debug == ON)
+                    Print("handle MA 3: " + symbolArray[i].symbol + " berhasil dibuat");
+            }
+        }
+        break;
+
+    case 3: // MA4
+        symbolArray[i].isBuy[j] = (ma4_buy == ACTIVE);
+        symbolArray[i].isSell[j] = (ma4_sell == ACTIVE);
+        if (ma4_active == ON)
+        {
+            symbolArray[i].handle[j] = iMA(symbolArray[i].symbol,
+                                           ma4_timeframe,
+                                           ma4_periode,
+                                           ma4_shift,
+                                           ma4_method,
+                                           ma4_price);
+            if (symbolArray[i].handle[j] != INVALID_HANDLE)
+            {
+                symbolArray[i].isActive[j] = true;
+                symbolArray[i].timeframe[j] = ma4_timeframe;
+                symbolArray[i].signal_type[j] = ma4_type;
+                if (debug == ON)
+                    Print("handle MA 4: " + symbolArray[i].symbol + " berhasil dibuat");
+            }
+        }
+        break;
+
+    case 4: // MA5
+        symbolArray[i].isBuy[j] = (ma5_buy == ACTIVE);
+        symbolArray[i].isSell[j] = (ma5_sell == ACTIVE);
+        if (ma5_active == ON)
+        {
+            symbolArray[i].handle[j] = iMA(symbolArray[i].symbol,
+                                           ma5_timeframe,
+                                           ma5_periode,
+                                           ma5_shift,
+                                           ma5_method,
+                                           ma5_price);
+            if (symbolArray[i].handle[j] != INVALID_HANDLE)
+            {
+                symbolArray[i].isActive[j] = true;
+                symbolArray[i].timeframe[j] = ma5_timeframe;
+                symbolArray[i].signal_type[j] = ma5_type;
+                if (debug == ON)
+                    Print("handle MA 5: " + symbolArray[i].symbol + " berhasil dibuat");
+            }
+        }
+        break;
+
+    case 5: // MA6
+        symbolArray[i].isBuy[j] = (ma6_buy == ACTIVE);
+        symbolArray[i].isSell[j] = (ma6_sell == ACTIVE);
+        if (ma6_active == ON)
+        {
+            symbolArray[i].handle[j] = iMA(symbolArray[i].symbol,
+                                           ma6_timeframe,
+                                           ma6_periode,
+                                           ma6_shift,
+                                           ma6_method,
+                                           ma6_price);
+            if (symbolArray[i].handle[j] != INVALID_HANDLE)
+            {
+                symbolArray[i].isActive[j] = true;
+                symbolArray[i].timeframe[j] = ma6_timeframe;
+                symbolArray[i].signal_type[j] = ma6_type;
+                if (debug == ON)
+                    Print("handle MA 6: " + symbolArray[i].symbol + " berhasil dibuat");
+            }
+        }
+        break;
+    }
+}
+void IncHandleBB(int i, int j)
+{
+    int bbIndex = j - 6; // Konversi j ke index BB (0-4)
+
+    switch (bbIndex)
+    {
+    case 0: // BB1
+        symbolArray[i].isBuy[j] = (bb1_buy == ACTIVE);
+        symbolArray[i].isSell[j] = (bb1_sell == ACTIVE);
+        if (bb1_active == ON)
+        {
+            symbolArray[i].handle[j] = iBands(symbolArray[i].symbol,
+                                              bb1_timeframe,
+                                              bb1_periode,
+                                              bb1_shift,
+                                              bb1_deviation,
+                                              bb1_price);
+            if (symbolArray[i].handle[j] != INVALID_HANDLE)
+            {
+                symbolArray[i].isActive[j] = true;
+                symbolArray[i].timeframe[j] = bb1_timeframe;
+                symbolArray[i].signal_type[j] = bb1_type;
+                if (debug == ON)
+                    Print("handle BB 1: " + symbolArray[i].symbol + " berhasil dibuat");
+            }
+        }
+        break;
+
+    case 1: // BB2
+        symbolArray[i].isBuy[j] = (bb2_buy == ACTIVE);
+        symbolArray[i].isSell[j] = (bb2_sell == ACTIVE);
+        if (bb2_active == ON)
+        {
+            symbolArray[i].handle[j] = iBands(symbolArray[i].symbol,
+                                              bb2_timeframe,
+                                              bb2_periode,
+                                              bb2_shift,
+                                              bb2_deviation,
+                                              bb2_price);
+            if (symbolArray[i].handle[j] != INVALID_HANDLE)
+            {
+                symbolArray[i].isActive[j] = true;
+                symbolArray[i].timeframe[j] = bb2_timeframe;
+                symbolArray[i].signal_type[j] = bb2_type;
+                if (debug == ON)
+                    Print("handle BB 2: " + symbolArray[i].symbol + " berhasil dibuat");
+            }
+        }
+        break;
+
+    case 2: // BB3
+        symbolArray[i].isBuy[j] = (bb3_buy == ACTIVE);
+        symbolArray[i].isSell[j] = (bb3_sell == ACTIVE);
+        if (bb3_active == ON)
+        {
+            symbolArray[i].handle[j] = iBands(symbolArray[i].symbol,
+                                              bb3_timeframe,
+                                              bb3_periode,
+                                              bb3_shift,
+                                              bb3_deviation,
+                                              bb3_price);
+            if (symbolArray[i].handle[j] != INVALID_HANDLE)
+            {
+                symbolArray[i].isActive[j] = true;
+                symbolArray[i].timeframe[j] = bb3_timeframe;
+                symbolArray[i].signal_type[j] = bb3_type;
+                if (debug == ON)
+                    Print("handle BB 3: " + symbolArray[i].symbol + " berhasil dibuat");
+            }
+        }
+        break;
+
+    case 3: // BB4
+        symbolArray[i].isBuy[j] = (bb4_buy == ACTIVE);
+        symbolArray[i].isSell[j] = (bb4_sell == ACTIVE);
+        if (bb4_active == ON)
+        {
+            symbolArray[i].handle[j] = iBands(symbolArray[i].symbol,
+                                              bb4_timeframe,
+                                              bb4_periode,
+                                              bb4_shift,
+                                              bb4_deviation,
+                                              bb4_price);
+            if (symbolArray[i].handle[j] != INVALID_HANDLE)
+            {
+                symbolArray[i].isActive[j] = true;
+                symbolArray[i].timeframe[j] = bb4_timeframe;
+                symbolArray[i].signal_type[j] = bb4_type;
+                if (debug == ON)
+                    Print("handle BB 4: " + symbolArray[i].symbol + " berhasil dibuat");
+            }
+        }
+        break;
+
+    case 4: // BB5
+        symbolArray[i].isBuy[j] = (bb5_buy == ACTIVE);
+        symbolArray[i].isSell[j] = (bb5_sell == ACTIVE);
+        if (bb5_active == ON)
+        {
+            symbolArray[i].handle[j] = iBands(symbolArray[i].symbol,
+                                              bb5_timeframe,
+                                              bb5_periode,
+                                              bb5_shift,
+                                              bb5_deviation,
+                                              bb5_price);
+            if (symbolArray[i].handle[j] != INVALID_HANDLE)
+            {
+                symbolArray[i].isActive[j] = true;
+                symbolArray[i].timeframe[j] = bb5_timeframe;
+                symbolArray[i].signal_type[j] = bb5_type;
+                if (debug == ON)
+                    Print("handle BB 5: " + symbolArray[i].symbol + " berhasil dibuat");
+            }
+        }
+        break;
+    }
+}
+
+void IncGetSetSignalManual()
+{
+    const int dataPoints = 3;                    // current and previous bars
+    int totalSize = totalSymbols * totalHandles; // Hitung total size yang dibutuhkan
+
+    switch (signal_manual)
+    {
+    case ENUM_INDICATOR_TYPE::IND_MOVING_AVERAGE:
+    case ENUM_INDICATOR_TYPE::IND_RSI:
+    {
+        // Deklarasi array
+        double tempBufferIndicator[];
+        double tempBufferClose[];
+
+        // Resize arrays
+        ArrayResize(tempBufferIndicator, dataPoints);
+        ArrayResize(tempBufferClose, dataPoints);
+
+        // Set temporary buffers sebagai time series
+        ArraySetAsSeries(tempBufferIndicator, true);
+        ArraySetAsSeries(tempBufferClose, true);
+
+        // Loop untuk setiap simbol dan handle
+        for (int s = 0; s < totalSymbols; s++)
+        {
+            string symbol = symbolArray[s].symbol;
+            if ((int)SymbolInfoInteger(symbol, SYMBOL_SPREAD) > max_spread)
+            {
+                if (debug == ON)
+                    Print("Symbol " + symbol + " memiliki spread lebih besar dari maksimal spread yang diizinkan MODE MANUAL");
+                continue;
+            }
+            for (int h = 0; h < totalHandles; h++)
+            {
+                int arrayIndex = (s * totalHandles) + h;
+                if (CopyBuffer(symbolArray[s].handle[h], 0, 0, dataPoints, tempBufferIndicator) > 0)
+                {
+                    if (CopyClose(symbolArray[s].symbol, symbolArray[s].timeframe[h], 0, dataPoints, tempBufferClose) > 0)
+                    {
+                        bool upCurr = false;
+                        bool upPrev = false;
+                        // bool upPrev2 = false;
+                        bool downCurr = false;
+                        bool downPrev = false;
+                        if (signal_manual == IND_MOVING_AVERAGE) // MA
+                        {
+                            upCurr = tempBufferClose[0] > tempBufferIndicator[0];
+                            upPrev = tempBufferClose[1] > tempBufferIndicator[1];
+                            // upPrev2 = tempBufferClose[2] > tempBufferIndicator[2];
+                        }
+                        else // RSI
+                        {
+                            upCurr = tempBufferIndicator[0] > 70;
+                            upPrev = tempBufferIndicator[1] > 70;
+                            downCurr = tempBufferIndicator[0] > 30;
+                            downPrev = tempBufferIndicator[1] > 30;
+                        }
+
+                        // Proses sinyal berdasarkan tipe
+                        switch (signal_manual_type)
+                        {
+                        case ENUM_SIGNAL_MANUAL_TYPE::UP_DOWN:
+                            if (signal_manual == IND_MOVING_AVERAGE) // MA
+                                symbolArray[s].signal[h] = (upCurr) ? 1 : -1;
+                            else // RSI
+                                symbolArray[s].signal[h] = (upCurr) ? 1 : (!downCurr) ? -1
+                                                                                      : 0;
+                            break;
+                        case ENUM_SIGNAL_MANUAL_TYPE::UP_DOWN_REVERSE:
+                            if (signal_manual == IND_MOVING_AVERAGE) // MA
+                                symbolArray[s].signal[h] = (upCurr) ? -1 : 1;
+                            else // RSI
+                                symbolArray[s].signal[h] = (upCurr) ? -1 : (!downCurr) ? 1
+                                                                                       : 0;
+                            break;
+                        case ENUM_SIGNAL_MANUAL_TYPE::CROSS_FOLLOW:  //  down up = buy
+                            if (signal_manual == IND_MOVING_AVERAGE) // MA
+
+                                symbolArray[s].signal[h] = (upCurr && !upPrev) ? 1 : (!upCurr && upPrev) ? -1
+                                                                                                         : 0;
+                            else // RSI
+                                symbolArray[s].signal[h] = (upCurr && !upPrev) ? 1 : (!downCurr && downPrev) ? -1
+                                                                                                             : 0;
+                            break;
+                        case ENUM_SIGNAL_MANUAL_TYPE::CROSS_FOLLOW_REVERSE: //  up down = buy
+                            if (signal_manual == IND_MOVING_AVERAGE)        // MA
+                                symbolArray[s]
+                                    .signal[h] = (!upCurr && upPrev) ? 1 : (upCurr && !upPrev) ? -1
+                                                                                               : 0;
+                            else // RSI
+                                symbolArray[s]
+                                    .signal[h] = (downCurr && !downPrev) ? 1 : (!upCurr && upPrev) ? -1
+                                                                                                   : 0;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    case IND_BOLLINGER_BANDS:
+    {
+        double tempUpper[], tempLower[];
+        double tempBufferClose[];
+
+        ArrayResize(tempUpper, dataPoints);
+        ArrayResize(tempLower, dataPoints);
+        ArrayResize(tempBufferClose, dataPoints);
+
+        ArraySetAsSeries(tempUpper, true);
+        ArraySetAsSeries(tempLower, true);
+        ArraySetAsSeries(tempBufferClose, true);
+
+        for (int s = 0; s < totalSymbols; s++)
+        {
+            string symbol = symbolArray[s].symbol;
+            bool isSpread = (int)SymbolInfoInteger(symbol, SYMBOL_SPREAD) > max_spread;
+            if (isSpread)
+            {
+                if (debug == ON)
+                    Print("Symbol " + symbol + " memiliki spread lebih besar dari maksimal spread yang diizinkan MODE MANUAL");
+                continue;
+            }
+            for (int h = 0; h < totalHandles; h++)
+            {
+                int arrayIndex = (s * totalHandles) + h;
+                if (
+                    CopyBuffer(symbolArray[s].handle[h], 1, 0, dataPoints, tempUpper) > 0 &&
+                    CopyBuffer(symbolArray[s].handle[h], 2, 0, dataPoints, tempLower) > 0)
+                {
+                    if (CopyClose(symbolArray[s].symbol, symbolArray[s].timeframe[h], 0, dataPoints, tempBufferClose) > 0)
+                    {
+                        bool prevCloseAboveUpper = tempBufferClose[1] > tempUpper[1];
+                        bool currCloseAboveUpper = tempBufferClose[0] > tempUpper[0];
+                        bool prevCloseAboveLower = tempBufferClose[1] > tempLower[1];
+                        bool currCloseAboveLower = tempBufferClose[0] > tempLower[0];
+
+                        switch (signal_manual_type)
+                        {
+                        case ENUM_SIGNAL_MANUAL_TYPE::UP_DOWN:
+                            symbolArray[s].signal[h] = (currCloseAboveUpper)    ? 1
+                                                       : (!currCloseAboveLower) ? -1
+                                                                                : 0;
+                            break;
+                        case ENUM_SIGNAL_MANUAL_TYPE::UP_DOWN_REVERSE:
+                            symbolArray[s].signal[h] = (currCloseAboveUpper)    ? -1
+                                                       : (!currCloseAboveLower) ? 1
+                                                                                : 0;
+                            break;
+                        case ENUM_SIGNAL_MANUAL_TYPE::CROSS_FOLLOW:
+                        {
+
+                            symbolArray[s].signal[h] = (currCloseAboveUpper && !prevCloseAboveUpper)   ? 1
+                                                       : (!currCloseAboveLower && prevCloseAboveLower) ? -1
+                                                                                                       : 0;
+                            break;
+                        }
+                        case ENUM_SIGNAL_MANUAL_TYPE::CROSS_FOLLOW_REVERSE:
+                        {
+                            symbolArray[s].signal[h] = (currCloseAboveUpper && !prevCloseAboveUpper)   ? -1
+                                                       : (!currCloseAboveLower && prevCloseAboveLower) ? 1
+                                                                                                       : 0;
+                            break;
+                        }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    break;
     }
 }

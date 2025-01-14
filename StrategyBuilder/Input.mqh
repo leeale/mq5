@@ -5,7 +5,6 @@
 input string _ll = "========== ( SETTING GENERAL) =========="; // ​
 input ENUM_ON_OFF debug = OFF;                                 // Debuging
 input ENUM_ON_OFF power = ON;                                  // Power EA
-input ENUM_STRATEGY_COMBINATION combi_signal = AND;            // Signal Combination
 input int m_targetProfit = 10;                                 // Close All Profit, Dari Balance Terakhir (File Balance)
 input int m_balancedManual = 0;                                // Set Balanced Manual Harus direset ke 0 Setelah Input
 input int InpStopLoss = 0;                                     // Hidden Stop Loss (in points, 0=off)
@@ -61,7 +60,9 @@ input double iBreakeven_dollar = 0; // Break Even Dollar
 input double iBreakeven_point = 0;  // Break Even Poin
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-input string _ll3 = "========== ( SETTING SIGNAL) ==========";                       // ​
+
+input string _ll3 = "========== ( SETTING MODE SIGNAL) ==========";                  // ​
+input ENUM_STRATEGY_COMBINATION combi_signal = AND;                                  // Signal Combination
 input ENUM_MODE_SIGNAL signal_mode = ENUM_MODE_SIGNAL::DISABLE;                      // Mode Signal
 input ENUM_SIGNAL_AUTO signal_auto = ENUM_SIGNAL_AUTO::SIGNAL_1;                     // Signal Auto
 input ENUM_INDICATOR_TYPE signal_manual = ENUM_INDICATOR_TYPE::IND_MOVING_AVERAGE;   // Signal Manual
