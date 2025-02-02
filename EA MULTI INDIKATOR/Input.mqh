@@ -1,6 +1,8 @@
+#include "Data.mqh";
 
-
-#include "Enum.mqh"
+input ENUM_SYMBOL_TYPE i_symbolType = ENUM_SYMBOL_TYPE::SYMBOL_CURRENT;                // Symbol Type
+input ENUM_SYMBOL_BASE i_symbolBase = USD;                                             // Mode Base Symbol
+input string i_symbolCustomMulti = "GBPUSD,GBPJPY,GBPCHF,GBPAUD,GBPNZD,GBPCAD,EURGBP"; // Custom Symbol 1
 
 input string _ll = "========== ( SETTING GENERAL) =========="; // ​
 input ENUM_ON_OFF debug = OFF;                                 // Debuging
@@ -15,10 +17,7 @@ input ENUM_TRIGGER_TYPE triggerType = TRIGGER_DOLLARS;                          
 input double triggerValue = 10;                                                 // Trigger Value ($ or Points)
 
 input string _ll2 = "========== ( SETTING SYMBOL) ==========";                          // ​
-input ENUM_SYMBOL_TYPE multi_symbol = ENUM_SYMBOL_TYPE::SYMBOL_CURRENT;                 // Symbol Type
-input BaseSymbol TradingBaseOnSymbol = USD;                                             // Mode Base Symbol
 input ENUM_BASE_DIRECTION base_direction = ENUM_BASE_DIRECTION::BUY;                    // Base Direction (ex Buy, USDXXX Buy, XXXUSD Sell)
-input string multi_symbol_custom = "GBPUSD,GBPJPY,GBPCHF,GBPAUD,GBPNZD,GBPCAD,EURGBP";  // Custom Symbol 1
 input string multi_symbol_custom1 = "EURUSD,EURJPY,EURCHF,EURAUD,EURNZD,EURCAD,EURGBP"; // Custom Symbol 2
 input string multi_symbol_custom2 = "USDJPY,USDCAD,USDCHF,EURUSD,GBPUSD,AUDUS,NZDUSD";  // Custom Symbol 2
 input string multi_symbol_custom3 = "USDJPY,EURJPY,GBPJPY,AUDJPY,NZJPY,CADJPY,CHFJPY";  // Custom Symbol 3
@@ -85,6 +84,8 @@ input int ma1_periode = 14;                                      // Moving Avera
 input int ma1_shift = 0;                                         // Moving Average Shift
 input ENUM_MA_METHOD ma1_method = MODE_SMA;                      // Moving Average Method
 input ENUM_APPLIED_PRICE ma1_price = PRICE_CLOSE;                // Moving Average Applied Price
+
+// ====================== INDIKATOR MA ======================
 input string ma2 = "========== (MA) 2# indikator MA =========="; // ​
 input ENUM_ON_OFF ma2_active = OFF;                              // On Off Moving Averaging
 input ENUM_SIGNAL_TYPE ma2_type = ENUM_SIGNAL_TYPE::UP_DOWN;     // Signal Type

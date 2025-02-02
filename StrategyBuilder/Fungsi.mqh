@@ -1,5 +1,6 @@
 #include <Trade/Trade.mqh>
 #include <Trade/PositionInfo.mqh>
+#include <Trade/SymbolInfo.mqh>
 #include "Input.mqh"
 
 #define BUTTON_NAME "closeall"
@@ -9,8 +10,261 @@ double m_savedBalance;
 bool m_isBalanceLoaded;
 
 CPositionInfo pos;
+CSymbolInfo sym;
 CTrade trade;
 
+bool Isdebug = (debug == ON);
+// Basic order validation
+bool ValidateTradeDirection(string symbol, int signal, ENUM_TRADING_DIRECTION direction)
+{
+    switch (direction)
+    {
+    case ENUM_TRADING_DIRECTION::BUY:
+        return (signal == 1);
+
+    case ENUM_TRADING_DIRECTION::SELL:
+        return (signal == -1);
+
+    case ENUM_TRADING_DIRECTION::ONE_SIDE:
+        return ValidateOneSideDirection(symbol, signal);
+
+    case ENUM_TRADING_DIRECTION::BOOTH_SIDE:
+        return true; // Always allow both directions
+    }
+    return false;
+}
+bool ValidateMaxCustomOrders(string symbol)
+{
+    if (max_order <= 0 && max_order_total <= 0)
+        return true;
+
+    int symbolPositions = 0;
+    int totalPositions = 0;
+    double currentPrice = SymbolInfoDouble(symbol, SYMBOL_BID);
+
+    for (int i = 0; i < PositionsTotal(); i++)
+    {
+        if (!pos.SelectByIndex(i) || pos.Magic() != magic_number)
+            continue;
+
+        totalPositions++;
+
+        if (pos.Symbol() == symbol)
+        {
+            symbolPositions++;
+
+            if (min_distance_points > 0)
+            {
+                double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+                if (MathAbs(currentPrice - pos.PriceOpen()) / point < min_distance_points)
+                    return false;
+            }
+        }
+    }
+
+    if (max_order > 0 && symbolPositions >= max_order)
+        return false;
+
+    if (max_order_total > 0 && totalPositions >= max_order_total)
+        return false;
+
+    return true;
+}
+bool ValidateOneSideDirection(string symbol, int signal)
+{
+    for (int i = 0; i < PositionsTotal(); i++)
+    {
+        if (pos.SelectByIndex(i) && pos.Symbol() == symbol && pos.Magic() == magic_number)
+        {
+            // Check for opposite direction
+            if ((signal == 1 && pos.PositionType() == POSITION_TYPE_SELL) ||
+                (signal == -1 && pos.PositionType() == POSITION_TYPE_BUY))
+                return false;
+        }
+    }
+    return true;
+}
+bool ValidateOneOrderPerSymbol(string symbol)
+{
+    for (int i = 0; i < PositionsTotal(); i++)
+    {
+        if (pos.SelectByIndex(i) && pos.Symbol() == symbol && pos.Magic() == magic_number)
+            return false;
+    }
+    return true;
+}
+
+bool ValidateOneOrderTotal()
+{
+    for (int i = 0; i < PositionsTotal(); i++)
+    {
+        if (pos.SelectByIndex(i) && pos.Magic() == magic_number)
+            return false;
+    }
+    return true;
+}
+
+bool ValidateOneOrderPerTimeframe(string symbol)
+{
+    datetime barTime = iTime(symbol, one_order_timeframe, 0);
+    double currentPrice = SymbolInfoDouble(symbol, SYMBOL_BID);
+
+    for (int i = 0; i < PositionsTotal(); i++)
+    {
+        if (pos.SelectByIndex(i) && pos.Symbol() == symbol && pos.Magic() == magic_number)
+        {
+            // Check time
+            if (pos.Time() >= barTime)
+                return false;
+
+            // Check minimum distance
+            if (min_distance_points > 0)
+            {
+                double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+                if (MathAbs(currentPrice - pos.PriceOpen()) / point < min_distance_points)
+                    return false;
+            }
+        }
+    }
+    return true;
+}
+
+int FindSymbolIndex(const string &symbols[], string symbol)
+{
+    int size = ArraySize(symbols); // Ambil ukuran array =28
+    for (int i = 0; i < size; i++)
+    {
+        if (symbols[i] == symbol) // Jika simbol ditemukan, return index
+            return i;
+    }
+    return -1; // Return -1 jika tidak ditemukan
+}
+void SymbolOrAllCloseByDollar(string symbol = NULL, bool isbuy = false, bool issell = false, bool issymbol = false, double trigger = 1)
+{
+    if (!isbuy && !issell)
+        return;
+    bool IsOrder = (PositionsTotal() > 0);
+    if (!IsOrder)
+        return;
+    double buyvalue = 0;
+    double sellvalue = 0;
+    bool buyProfit = false;
+    bool sellProfit = false;
+    bool buysellProfit = false;
+    bool flag = false;
+    for (int i = 0; i < PositionsTotal(); i++)
+    {
+        if (!pos.SelectByIndex(i))
+            continue;
+        if (issymbol && symbol != NULL)
+            if (pos.Symbol() != symbol)
+                continue;
+        if (pos.PositionType() == POSITION_TYPE_BUY)
+            buyvalue += pos.Profit();
+        if (pos.PositionType() == POSITION_TYPE_SELL)
+            sellvalue += pos.Profit();
+        flag = true;
+    }
+    if (!flag)
+        return;
+    buyProfit = (buyvalue >= trigger);
+    sellProfit = (sellvalue >= trigger);
+    buysellProfit = (buyvalue + sellvalue >= trigger);
+
+    if (!buyProfit && !sellProfit && !buysellProfit)
+    {
+        Print("Tidak ada profit yang mencapai atau melebihi trigger.");
+        return;
+    }
+
+    for (int i = 0; i < PositionsTotal(); i++)
+    {
+        if (!pos.SelectByIndex(i))
+            continue;
+        if (buysellProfit && issell && isbuy)
+        {
+            if (!trade.PositionClose(pos.Ticket()))
+                if (Isdebug)
+                    Print("Error closing position #", pos.Ticket(), " Error: ", GetLastError());
+            continue;
+        }
+        if (buyProfit && isbuy)
+        {
+            if (pos.PositionType() == POSITION_TYPE_BUY)
+                if (!trade.PositionClose(pos.Ticket()))
+                    if (Isdebug)
+                        Print("Error closing position #", pos.Ticket(), " Error: ", GetLastError());
+        }
+        if (sellProfit && issell)
+        {
+            if (pos.PositionType() == POSITION_TYPE_SELL)
+                if (!trade.PositionClose(pos.Ticket()))
+                    if (Isdebug)
+                        Print("Error closing position #", pos.Ticket(), " Error: ", GetLastError());
+        }
+    }
+}
+
+void SymbolCloseAllByPoint(string symbol, bool isbuy = false, bool isSell = false, double trigger = 30)
+{
+    if (PositionsTotal() <= 0)
+        return;
+    double currentpricebuy = 0;
+    double currentpricesell = 0;
+    double currentPointsymbol = 0;
+    double PriceBuyXlot = 0;
+    double PriceSellXlot = 0;
+    double volumeBuy = 0;
+    double volumeSell = 0;
+    bool buyProfit = false;
+    bool sellProfit = false;
+    // bool flagsymbol = false;
+    for (int i = 0; i < PositionsTotal(); i++)
+    {
+        if (!pos.SelectByIndex(i))
+            continue;
+        if (symbol == pos.Symbol())
+        {
+
+            if (pos.PositionType() == POSITION_TYPE_BUY)
+            {
+                PriceBuyXlot += pos.PriceOpen() * pos.Volume();
+                volumeBuy += pos.Volume();
+            }
+            if (pos.PositionType() == POSITION_TYPE_SELL)
+            {
+                PriceSellXlot += pos.PriceOpen() * pos.Volume();
+                volumeSell += pos.Volume();
+            }
+        }
+    }
+    currentPointsymbol = SymbolInfoDouble(symbol, SYMBOL_POINT);
+    currentpricebuy = SymbolInfoDouble(symbol, SYMBOL_BID);
+    currentpricesell = SymbolInfoDouble(symbol, SYMBOL_ASK);
+    if (currentpricebuy > 0 && PriceBuyXlot > 0 && volumeBuy > 0)
+        buyProfit = (currentpricebuy > (PriceBuyXlot / volumeBuy) + (trigger * currentPointsymbol));
+    if (currentpricesell > 0 && PriceSellXlot > 0 && volumeSell > 0)
+        sellProfit = (currentpricesell < (PriceSellXlot / volumeSell) - (trigger * currentPointsymbol));
+    if (!buyProfit && !sellProfit)
+        return;
+
+    // Print(PriceBuyXlot + (TriggerPoint * currentPointsymbol));
+
+    for (int i = PositionsTotal() - 1; i >= 0; i--)
+    {
+        if (!pos.SelectByIndex(i))
+            continue;
+        if (symbol == pos.Symbol())
+        {
+            if (isbuy && buyProfit && pos.PositionType() == POSITION_TYPE_BUY)
+                if (!trade.PositionClose(pos.Ticket()))
+                    Print("Error closing position #", pos.Ticket(), " Error: ", GetLastError());
+            if (isSell && sellProfit && pos.PositionType() == POSITION_TYPE_SELL)
+                if (!trade.PositionClose(pos.Ticket()))
+                    Print("Error closing position #", pos.Ticket(), " Error: ", GetLastError());
+        }
+    }
+}
 void FillArrayWithLastValue(string &dest[], string &source[], int totalSize)
 {
     int sourceSize = ArraySize(source);

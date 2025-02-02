@@ -1,3 +1,5 @@
+#ifndef DATA_MQH
+#define DATA_MQH
 enum ENUM_CLOSE_ALL_TRIGGER
 {
     CLOSE_SYMBOL_BUY_SELL, // Close All Symbol Order Current (Point / Dollar)
@@ -63,7 +65,7 @@ enum ENUM_DAY_INDO
     Disable
 
 };
-enum BaseSymbol
+enum ENUM_SYMBOL_BASE
 {
     USD, // USD
     GBP, // GBP
@@ -126,14 +128,22 @@ enum ENUM_ONE_ORDER_TYPE
 };
 enum ENUM_SYMBOL_TYPE
 {
-    MULTI_SYMBOL,   // Multi Symbol Market Watch
-    SYMBOL_CURRENT, // Current Symbol
+    SYMBOL_ALL,     // All available symbols
     SYMBOL_BASE,    // Mode Base Symbol
-    SYMBOL_CUSTOM,  // Custom Symbol 1
-    SYMBOL_CUSTOM1, // Custom Symbol 2
-    SYMBOL_CUSTOM2, // Custom Symbol 3
-    SYMBOL_CUSTOM3  // Custom Symbol 4
+    SYMBOL_CURRENT, // Current chart symbol
+    SYMBOL_CUSTOM,  // Custom symbol list
 };
+
+// enum ENUM_SYMBOL_TYPE
+// {
+//     MULTI_SYMBOL,   // Multi Symbol Market Watch
+//     SYMBOL_CURRENT, // Current Symbol
+//     SYMBOL_BASE,    // Mode Base Symbol
+//     SYMBOL_CUSTOM,  // Custom Symbol 1
+//     SYMBOL_CUSTOM1, // Custom Symbol 2
+//     SYMBOL_CUSTOM2, // Custom Symbol 3
+//     SYMBOL_CUSTOM3  // Custom Symbol 4
+// };
 enum ENUM_ON_OFF
 {
     ON, // On
@@ -180,3 +190,5 @@ enum ENUM_MA_SIGNAL_INDIKATOR2
 };
 
 // ================== ENUM BB ==================
+
+#endif

@@ -653,6 +653,135 @@ void IncGetDataSymbol()
 
 void MainOrder()
 {
+    // Handle SYMBOL_BASE mode
+    if (multi_symbol == ENUM_SYMBOL_TYPE::SYMBOL_BASE)
+    {
+        for (int i = 0; i < totalSymbols; i++)
+        {
+            if (symbolArray[i].finalsignal != 0 && symbolArray[i].finalsignal != symbolArray[i].signalBase)
+                symbolArray[i].finalsignal = 0;
+        }
+    }
+
+    for (int i = 0; i < totalSymbols; i++)
+    {
+        if (symbolArray[i].finalsignal == 0)
+            continue;
+        if (!IncFilterOrder(i))
+            continue;
+
+        string symbol = symbolArray[i].symbol;
+
+        // Get current prices
+        MqlTick latest_tick;
+        if (!SymbolInfoTick(symbol, latest_tick))
+        {
+            Print("Error getting tick data for ", symbol, ": ", GetLastError());
+            continue;
+        }
+
+        double ask = latest_tick.ask;
+        double bid = latest_tick.bid;
+        double spread = ask - bid;
+
+        // Calculate SL/TP
+        double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+        double min_sl = SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL) * point;
+        double sl = 0, tp = 0;
+
+        if (Stoploss > 0)
+        {
+            if (symbolArray[i].finalsignal == 1)
+            {
+                sl = ask - (Stoploss * point) - spread;
+                if (ask - sl < min_sl)
+                    sl = ask - min_sl - spread;
+            }
+            else
+            {
+                sl = bid + (Stoploss * point) + spread;
+                if (sl - bid < min_sl)
+                    sl = bid + min_sl + spread;
+            }
+        }
+
+        if (Takeprofit > 0)
+        {
+            if (symbolArray[i].finalsignal == 1)
+                tp = ask + (Takeprofit * point);
+            else
+                tp = bid - (Takeprofit * point);
+        }
+
+        // Calculate lot size
+        bool hasPosition = false;
+        for (int j = 0; j < PositionsTotal(); j++)
+        {
+            if (pos.SelectByIndex(j) && pos.Symbol() == symbol && pos.Magic() == magic_number)
+            {
+                hasPosition = true;
+                break;
+            }
+        }
+
+        double orderlot = CalculateLotSize(symbol, hasPosition);
+        if (orderlot <= 0)
+        {
+            Print("Invalid lot size for ", symbol, ": ", orderlot);
+            continue;
+        }
+
+        // Execute order
+        MqlTradeRequest request = {};
+        MqlTradeResult result = {};
+
+        request.action = TRADE_ACTION_DEAL;
+        request.symbol = symbol;
+        request.volume = orderlot;
+        request.deviation = 10;
+        request.magic = magic_number;
+        request.comment = komment;
+        request.type_filling = ORDER_FILLING_FOK;
+
+        if (symbolArray[i].finalsignal == 1) // BUY
+        {
+            request.type = ORDER_TYPE_BUY;
+            request.price = ask;
+            request.sl = sl;
+            request.tp = tp;
+
+            if (debug == ON)
+                Print("Attempting Buy - Symbol:", symbol, " Ask:", ask, " Lot:", orderlot, " SL:", sl, " TP:", tp);
+        }
+        else // SELL
+        {
+            request.type = ORDER_TYPE_SELL;
+            request.price = bid;
+            request.sl = sl;
+            request.tp = tp;
+
+            if (debug == ON)
+                Print("Attempting Sell - Symbol:", symbol, " Bid:", bid, " Lot:", orderlot, " SL:", sl, " TP:", tp);
+        }
+
+        bool order = OrderSend(request, result);
+
+        if (order && result.retcode == TRADE_RETCODE_DONE)
+        {
+            if (debug == ON)
+                Print("Order Success - Symbol:", symbol, " Time:", TimeLocal(),
+                      " Deal:", result.deal, " Volume:", result.volume);
+        }
+        else
+        {
+            if (debug == ON)
+                Print("Order Failed - Symbol:", symbol, " Error:", GetLastError(),
+                      " RetCode:", result.retcode, " RetMsg:", result.comment);
+        }
+    }
+}
+void MainOrder2()
+{
 
     //  Jika ada signal Base jalankan ini dulu
     if (multi_symbol == ENUM_SYMBOL_TYPE::SYMBOL_BASE)
@@ -670,9 +799,9 @@ void MainOrder()
     {
         if (symbolArray[i].finalsignal == 0)
             continue;
-        if (!IncFilterOrder(i))
-            continue;
-        Print("finalsignal: ", symbolArray[i].finalsignal);
+        // if (!IncFilterOrder(i))
+        //   continue;
+
         string symbol = symbolArray[i].symbol;
 
         // hitung stoploss dan takeprofit
@@ -712,109 +841,89 @@ void MainOrder()
                 tp = bid - (Takeprofit * point);
         }
 
-        // Cek posisi dengan mempertimbangkan arah trading
-        bool hasLongPosition = false;
-        bool hasShortPosition = false;
+        // Hitung lot
         double orderlot = IncCalcLot(symbol);
-
-        // Scan posisi yang ada
+        bool hasPosition = false;
         for (int j = 0; j < PositionsTotal(); j++)
         {
             if (pos.SelectByIndex(j) && pos.Symbol() == symbol && pos.Magic() == magic_number)
             {
-                if (pos.PositionType() == POSITION_TYPE_BUY)
-                    hasLongPosition = true;
-                else if (pos.PositionType() == POSITION_TYPE_SELL)
-                    hasShortPosition = true;
-            }
-        }
-
-        bool canOpenPosition = false;
-        if (symbolArray[i].finalsignal == 1) // BUY Signal
-        {
-            switch (trading_direction)
-            {
-            case ENUM_TRADING_DIRECTION::BUY:
-                canOpenPosition = true; // Selalu bisa buka BUY
-                if (hasLongPosition)
-                    orderlot = lotGrid;
-                break;
-
-            case ENUM_TRADING_DIRECTION::SELL:
-                canOpenPosition = false; // Tidak bisa buka BUY
-                break;
-
-            case ENUM_TRADING_DIRECTION::ONE_SIDE:
-                if (hasShortPosition)
-                    canOpenPosition = false;
-                else
-                {
-                    canOpenPosition = true;
-                    if (hasLongPosition)
-                        orderlot = lotGrid;
-                }
-                break;
-
-            case ENUM_TRADING_DIRECTION::BOOTH_SIDE:
-                canOpenPosition = true; // Selalu bisa buka posisi
-                // Untuk BUY signal
-                if (symbolArray[i].finalsignal == 1 && hasLongPosition)
-                    orderlot = lotGrid;
-                // Untuk SELL signal
-                else if (symbolArray[i].finalsignal == -1 && hasShortPosition)
-                    orderlot = lotGrid;
+                hasPosition = true;
                 break;
             }
         }
-        else if (symbolArray[i].finalsignal == -1) // SELL Signal
+        if (hasPosition)
+            orderlot = lotGrid;
+
+        // Debug lot size
+        Print("Pre-order check - Symbol:", symbol,
+              " HasPosition:", hasPosition,
+              " Original Lot:", IncCalcLot(symbol),
+              " Final Lot:", orderlot);
+
+        // Validasi lot sebelum order
+        if (orderlot <= 0)
         {
-            switch (trading_direction)
-            {
-            case ENUM_TRADING_DIRECTION::BUY:
-                canOpenPosition = false; // Tidak bisa buka SELL
-                break;
-
-            case ENUM_TRADING_DIRECTION::SELL:
-                canOpenPosition = true; // Selalu bisa buka SELL
-                if (hasShortPosition)
-                    orderlot = lotGrid;
-                break;
-
-            case ENUM_TRADING_DIRECTION::ONE_SIDE:
-                if (hasLongPosition)
-                    canOpenPosition = false;
-                else
-                {
-                    canOpenPosition = true;
-                    if (hasShortPosition)
-                        orderlot = lotGrid;
-                }
-                break;
-
-            case ENUM_TRADING_DIRECTION::BOOTH_SIDE:
-                canOpenPosition = true; // Bisa buka di kedua arah
-                if (hasShortPosition)
-                    orderlot = lotGrid;
-                break;
-            }
+            Print("Invalid lot size calculated for ", symbol, ": ", orderlot);
+            continue; // Gunakan continue bukan return
         }
 
         // membuka order berdasarkan final signal
         bool order = false;
         if (symbolArray[i].finalsignal == 1)
         {
-            Print("masuk");
+            Print("masuk sini");
+
+            // Refresh rates terbaru
+            MqlTick latest_tick;
+            if (!SymbolInfoTick(symbol, latest_tick))
+            {
+                Print("Error getting tick data: ", GetLastError());
+                return;
+            }
+
+            // Update ask price
+            ask = latest_tick.ask;
+
+            // Validasi harga dan volume
+            if (ask == 0 || orderlot <= 0)
+            {
+                Print("Invalid price or volume - Ask:", ask, " Lot:", orderlot);
+                return;
+            }
+
             trade.SetExpertMagicNumber(magic_number);
+            trade.SetDeviationInPoints(10);
+            trade.SetTypeFilling(ORDER_FILLING_FOK);
+
+            // Debug info sebelum order
+            Print("Attempting Buy - Symbol:", symbol,
+                  " Ask:", ask,
+                  " Lot:", orderlot,
+                  " SL:", sl,
+                  " TP:", tp,
+                  " Magic:", magic_number);
+
             order = trade.Buy(orderlot, symbol, ask, sl, tp, komment);
+
+            // Debug info setelah order
+            Print("Order result:", order,
+                  " RetCode:", trade.ResultRetcode(),
+                  " RetCodeDescription:", trade.ResultRetcodeDescription(),
+                  " Deal:", trade.ResultDeal(),
+                  " Order:", trade.ResultOrder(),
+                  " Volume:", trade.ResultVolume(),
+                  " Comment:", trade.ResultComment());
+
             if (order)
             {
                 if (debug == ON)
-                    Print("Order Buy: ", symbol, " Time Lokal: ", TimeLocal(), " Magic Number: ", magic_number);
+                    Print("Order Buy Success: ", symbol, " Time Local: ", TimeLocal(), " Magic Number: ", magic_number);
             }
             else
             {
                 if (debug == ON)
-                    Print("Error Order Buy: ", GetLastError());
+                    Print("Error Order Buy: ", GetLastError(), " Description: ", trade.ResultComment());
             }
         }
         else if (symbolArray[i].finalsignal == -1)
@@ -839,16 +948,19 @@ bool IncFilterOrder(int n)
 {
     string symbol = symbolArray[n].symbol;
 
-    switch (trading_direction)
+    if (trading_direction != ALL)
     {
-    case ENUM_TRADING_DIRECTION::BUY:
-        if (symbolArray[n].finalsignal != 1)
-            return false;
-        break;
-    case ENUM_TRADING_DIRECTION::SELL:
-        if (symbolArray[n].finalsignal != -1)
-            return false;
-        break;
+        switch (trading_direction)
+        {
+        case ENUM_TRADING_DIRECTION::BUY:
+            if (symbolArray[n].finalsignal != 1)
+                return false;
+            break;
+        case ENUM_TRADING_DIRECTION::SELL:
+            if (symbolArray[n].finalsignal != -1)
+                return false;
+            break;
+        }
     }
 
     int total_positions = PositionsTotal();
@@ -955,23 +1067,18 @@ bool IncFilterOrder(int n)
     case ORDER_MODE_GRID_LOSS:
     case ORDER_MODE_GRID_PROFIT:
     {
-
-        // Cek trading direction dulu
-        if (trading_direction != ENUM_TRADING_DIRECTION::BOOTH_SIDE)
+        // Validasi arah grid di awal
+        if (grid_direction_setting == GRID_BUY_ONLY && symbolArray[n].finalsignal != 1)
         {
-            // Validasi arah grid seperti biasa
-            if (grid_direction_setting == GRID_BUY_ONLY && symbolArray[n].finalsignal != 1)
-            {
-                if (debug == ON)
-                    Print("Signal tidak sesuai untuk GRID_BUY_ONLY");
-                return false;
-            }
-            if (grid_direction_setting == GRID_SELL_ONLY && symbolArray[n].finalsignal != -1)
-            {
-                if (debug == ON)
-                    Print("Signal tidak sesuai untuk GRID_SELL_ONLY");
-                return false;
-            }
+            if (debug == ON)
+                Print("Signal tidak sesuai untuk GRID_BUY_ONLY");
+            return false;
+        }
+        if (grid_direction_setting == GRID_SELL_ONLY && symbolArray[n].finalsignal != -1)
+        {
+            if (debug == ON)
+                Print("Signal tidak sesuai untuk GRID_SELL_ONLY");
+            return false;
         }
         double current_price = SymbolInfoDouble(symbol, SYMBOL_ASK);
         double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
@@ -1139,84 +1246,75 @@ bool IncFilterOrder(int n)
                     return false;
             }
         }
-        // Kalkulasi lot grid
+        // Tambahan kalkulasi lot grid
         if (grid_lot_mode != GRID_DISABLE)
         {
             lotGrid = lot; // Set default ke lot dari input
-            double firstLot = 0;
+            double lastLot = 0;
             int positionCount = 0;
-            ENUM_POSITION_TYPE firstPosType = POSITION_TYPE_BUY;
-            bool foundFirstPosition = false;
 
-            // Cari posisi pertama dan hitung jumlah posisi dengan arah yang sama
-            for (int i = total_positions - 1; i >= 0; i--)
+            if (grid_lot_mode == GRID_LOT_MULTIPLY || grid_lot_mode == GRID_LOT_ADD || grid_lot_mode == GRID_LOT_CUSTOM)
             {
-                if (pos.SelectByIndex(i) &&
-                    pos.Symbol() == symbol &&
-                    pos.Magic() == magic_number)
+                for (int i = 0; i < total_positions; i++)
                 {
-                    if (!foundFirstPosition)
-                    {
-                        firstLot = pos.Volume();
-                        firstPosType = pos.PositionType();
-                        foundFirstPosition = true;
-                    }
-
-                    // Hitung hanya posisi dengan arah yang sama
-                    if (pos.PositionType() == firstPosType)
+                    if (pos.SelectByIndex(i) &&
+                        pos.Symbol() == symbol &&
+                        pos.Magic() == magic_number)
                     {
                         positionCount++;
+                        lastLot = pos.Volume();
+                    }
+                }
+
+                if (lastLot > 0)
+                {
+                    if (grid_lot_mode == GRID_LOT_MULTIPLY)
+                    {
+                        // Menggunakan lot input sebagai dasar
+                        lotGrid = lot * MathPow(martingale_multiplier, positionCount);
+                    }
+                    else if (grid_lot_mode == GRID_LOT_ADD)
+                    {
+                        // Menggunakan lot input sebagai dasar
+                        lotGrid = lot + (grid_add_value * positionCount);
+                    }
+                    else if (grid_lot_mode == GRID_LOT_CUSTOM)
+                    {
+                        string lots[];
+                        int total_lots = StringSplit(grid_lot_custom, ',', lots);
+
+                        // Konversi string ke array double
+                        double custom_lots[];
+                        ArrayResize(custom_lots, total_lots);
+
+                        for (int i = 0; i < total_lots; i++)
+                        {
+                            custom_lots[i] = StringToDouble(lots[i]);
+                        }
+
+                        // Gunakan lot sesuai urutan grid
+                        if (positionCount < total_lots)
+                        {
+                            lotGrid = custom_lots[positionCount];
+                        }
+                        else
+                        {
+                            // Jika melebihi jumlah lot yang didefinisikan, gunakan lot terakhir
+                            lotGrid = custom_lots[total_lots - 1];
+                        }
                     }
                 }
             }
-
-            if (foundFirstPosition)
+            else if (grid_lot_mode == GRID_LOT_FIXED)
             {
-                if (grid_lot_mode == GRID_LOT_MULTIPLY)
-                {
-                    // Menggunakan lot posisi pertama sebagai dasar
-                    lotGrid = firstLot * martingale_multiplier;
-                }
-                else if (grid_lot_mode == GRID_LOT_ADD)
-                {
-                    // Menggunakan lot posisi pertama sebagai dasar
-                    lotGrid = firstLot + grid_add_value;
-                }
-                else if (grid_lot_mode == GRID_LOT_CUSTOM)
-                {
-                    string lots[];
-                    int total_lots = StringSplit(grid_lot_custom, ',', lots);
-
-                    // Konversi string ke array double
-                    double custom_lots[];
-                    ArrayResize(custom_lots, total_lots);
-
-                    for (int i = 0; i < total_lots; i++)
-                    {
-                        custom_lots[i] = StringToDouble(lots[i]);
-                    }
-
-                    // Gunakan lot sesuai urutan grid
-                    if (positionCount < total_lots)
-                    {
-                        lotGrid = custom_lots[positionCount];
-                    }
-                    else
-                    {
-                        // Jika melebihi jumlah lot yang didefinisikan, gunakan lot terakhir
-                        lotGrid = custom_lots[total_lots - 1];
-                    }
-                }
+                lotGrid = fixed_lot;
             }
         }
-        else if (grid_lot_mode == GRID_LOT_FIXED)
-        {
-            lotGrid = fixed_lot;
-        }
 
-        // Terapkan batas maksimum lot
         if (grid_max_lot > 0 && lotGrid > grid_max_lot)
             lotGrid = grid_max_lot;
+
+        break;
     }
     }
     return true;
@@ -1307,6 +1405,123 @@ void MainTargetOnChart()
             CheckAndCloseAllOrders();
         }
     }
+}
+double CalculateLotSize(string symbol, bool hasPosition)
+{
+    double calculatedLot = lot;
+    int positionCount = 0;
+    // If position exists, calculate grid lot based on settings
+    if (hasPosition && grid_lot_mode != GRID_DISABLE)
+    {
+        switch (grid_lot_mode)
+        {
+        case GRID_LOT_FIXED:
+            calculatedLot = fixed_lot;
+            break;
+
+        case GRID_LOT_MULTIPLY:
+        {
+            positionCount = 0;
+            for (int i = 0; i < PositionsTotal(); i++)
+            {
+                if (pos.SelectByIndex(i) && pos.Symbol() == symbol && pos.Magic() == magic_number)
+                {
+                    positionCount++;
+                }
+            }
+            calculatedLot = lot * MathPow(martingale_multiplier, positionCount);
+            break;
+        }
+        case GRID_LOT_ADD:
+        {
+            positionCount = 0;
+            for (int i = 0; i < PositionsTotal(); i++)
+            {
+                if (pos.SelectByIndex(i) && pos.Symbol() == symbol && pos.Magic() == magic_number)
+                {
+                    positionCount++;
+                }
+            }
+            calculatedLot = lot + (grid_add_value * positionCount);
+            break;
+        }
+        case GRID_LOT_CUSTOM:
+        {
+            string lots[];
+            int totalLots = StringSplit(grid_lot_custom, ',', lots);
+            positionCount = 0;
+            for (int i = 0; i < PositionsTotal(); i++)
+            {
+                if (pos.SelectByIndex(i) && pos.Symbol() == symbol && pos.Magic() == magic_number)
+                {
+                    positionCount++;
+                }
+            }
+            if (positionCount < totalLots)
+            {
+                calculatedLot = StringToDouble(lots[positionCount]);
+            }
+            else
+            {
+                calculatedLot = StringToDouble(lots[totalLots - 1]);
+            }
+            break;
+        }
+        }
+    }
+    else
+    {
+        // Calculate initial lot size based on lot type
+        switch (lot_type)
+        {
+        case LOT_FIXED:
+            calculatedLot = lot;
+            break;
+
+        case LOT_BALANCE:
+        {
+            double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+            calculatedLot = NormalizeDouble((balance / lot_balance) * lot, 2);
+            break;
+        }
+        case LOT_EQUITY:
+        {
+            double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+            calculatedLot = NormalizeDouble((equity / lot_balance) * lot, 2);
+            break;
+        }
+        case LOT_RISK:
+        {
+            if (Stoploss <= 0)
+            {
+                calculatedLot = 0.01;
+                break;
+            }
+            double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+            double riskAmount = balance * (risk_percent / 100);
+            double tickValue = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
+            double totalLoss = Stoploss * tickValue;
+            calculatedLot = NormalizeDouble(riskAmount / totalLoss, 2);
+            break;
+        }
+        }
+    }
+
+    // Apply lot size limits
+    if (grid_max_lot > 0 && calculatedLot > grid_max_lot)
+    {
+        calculatedLot = grid_max_lot;
+    }
+    if (max_lot > 0 && calculatedLot > max_lot)
+    {
+        calculatedLot = max_lot;
+    }
+    if (calculatedLot < 0.01)
+    {
+        calculatedLot = 0.01;
+    }
+
+    return calculatedLot;
 }
 
 double IncCalcLot(string symbol)

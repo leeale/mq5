@@ -1,3 +1,39 @@
+
+
+enum ENUM_TRADING_DIRECTION
+{
+    BUY,       // Buy
+    SELL,      // Sell
+    ONE_SIDE,  // One Side
+    BOOTH_SIDE // Booth Side
+};
+enum ENUM_BASE_DIRECTION
+{
+    BUY,     // Buy Base
+    SELL,    // Sell Base
+    ALL_BUY, // All Buy (ex: xxxUSD Or USDxxx = Buy)
+    ALL_SELL // All Sell (ex: xxxGBP Or GBPxxx = Sell)
+};
+enum ENUM_SYMBOL_BASE
+{
+    USD, // USD
+    GBP, // GBP
+    EUR, // EUR
+    JPY, // JPY
+    CAD, // CAD
+    CHF, // CHF
+    AUD, // AUD
+    NZD  // NZD
+
+};
+enum ENUM_SYMBOL_TYPE
+{
+    SYMBOL_ALL,     // All available symbols
+    SYMBOL_BASE,    // Mode Base Symbol
+    SYMBOL_CURRENT, // Current chart symbol
+    SYMBOL_CUSTOM,  // Custom symbol list
+};
+
 enum ENUM_CLOSE_ALL_TRIGGER
 {
     CLOSE_SYMBOL_BUY_SELL, // Close All Symbol Order Current (Point / Dollar)
@@ -63,33 +99,6 @@ enum ENUM_DAY_INDO
     Disable
 
 };
-enum BaseSymbol
-{
-    USD, // USD
-    GBP, // GBP
-    EUR, // EUR
-    JPY, // JPY
-    CAD, // CAD
-    CHF, // CHF
-    AUD, // AUD
-    NZD  // NZD
-
-};
-
-enum ENUM_TRADING_DIRECTION
-{
-    BUY,       // Buy
-    SELL,      // Sell
-    ONE_SIDE,  // One Side
-    BOOTH_SIDE // Booth Side
-};
-enum ENUM_BASE_DIRECTION
-{
-    BUY,     // Buy Base
-    SELL,    // Sell Base
-    ALL_BUY, // All Buy (ex: xxxUSD Or USDxxx = Buy)
-    ALL_SELL // All Sell (ex: xxxGBP Or GBPxxx = Sell)
-};
 
 enum ENUM_LOT_TYPE
 {
@@ -124,16 +133,17 @@ enum ENUM_ONE_ORDER_TYPE
     ORDER_MODE_GRID_LOSS,                        // Order Mode Grid Loss
 
 };
-enum ENUM_SYMBOL_TYPE
-{
-    MULTI_SYMBOL,   // Multi Symbol Market Watch
-    SYMBOL_CURRENT, // Current Symbol
-    SYMBOL_BASE,    // Mode Base Symbol
-    SYMBOL_CUSTOM,  // Custom Symbol 1
-    SYMBOL_CUSTOM1, // Custom Symbol 2
-    SYMBOL_CUSTOM2, // Custom Symbol 3
-    SYMBOL_CUSTOM3  // Custom Symbol 4
-};
+
+// enum ENUM_SYMBOL_TYPE
+// {
+//     MULTI_SYMBOL,   // Multi Symbol Market Watch
+//     SYMBOL_CURRENT, // Current Symbol
+//     SYMBOL_BASE,    // Mode Base Symbol
+//     SYMBOL_CUSTOM,  // Custom Symbol 1
+//     SYMBOL_CUSTOM1, // Custom Symbol 2
+//     SYMBOL_CUSTOM2, // Custom Symbol 3
+//     SYMBOL_CUSTOM3  // Custom Symbol 4
+// };
 enum ENUM_ON_OFF
 {
     ON, // On
